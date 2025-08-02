@@ -38,6 +38,18 @@ test_cache/
 # Output files (optional - you might want to keep these)
 # outputs/
 
+# Large data files - exclude from Git
+*.csv
+outputs/*.csv
+*.parquet
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+
+# Keep only essential data files
+!portfolio_holdings.csv
+
 # OS generated files
 .DS_Store
 .DS_Store?
