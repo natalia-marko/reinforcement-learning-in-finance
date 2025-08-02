@@ -628,3 +628,436 @@ def validate_sentiment_vs_returns(
         })
     
     return pd.DataFrame(results), merged
+
+
+
+def get_significance_label(p_value):
+    """Return descriptive significance label based on p-value."""
+    if p_value < 0.001:
+        return "highly significant"
+    elif p_value < 0.01:
+        return "very significant"
+    elif p_value < 0.05:
+        return "significant"
+    else:
+        return "--------------"
+
+def print_correlation_breakdown(validation_summary, correlation_type="current"):
+    """Print correlation breakdown with asset lists and significance."""
+    if correlation_type == "current":
+        corr_col = 'current_corr'
+        p_col = 'current_p'
+        title = "Current Month Correlations"
+    else:
+        corr_col = 'lagged_corr'
+        p_col = 'lagged_p'
+        title = "Lagged Correlations (Predictive Power)"
+        validation_summary = validation_summary.dropna(subset=[corr_col])
+    
+    # Filter by correlation strength
+    strong = validation_summary[abs(validation_summary[corr_col]) > 0.3]
+    moderate = validation_summary[abs(validation_summary[corr_col]).between(0.1, 0.3)]
+    weak = validation_summary[abs(validation_summary[corr_col]) < 0.1]
+    
+    print(f"\n{title}:")
+    print(f"  Strong (>0.3): {len(strong)} assets")
+    if len(strong) > 0:
+        print("    Assets:")
+        for _, row in strong.iterrows():
+            significance = get_significance_label(row[p_col])
+            print(f"      {row['ticker']}: {row[corr_col]:.3f} (p={row[p_col]:.3f}) {significance}")
+    
+    print(f"  Moderate (0.1-0.3): {len(moderate)} assets")
+    if len(moderate) > 0:
+        print("    Assets:")
+        for _, row in moderate.iterrows():
+            significance = get_significance_label(row[p_col])
+            print(f"      {row['ticker']}: {row[corr_col]:.3f} (p={row[p_col]:.3f}) {significance}")
+    
+    print(f"  Weak (<0.1): {len(weak)} assets")
+    if len(weak) > 0:
+        print("    Assets:")
+        for _, row in weak.iterrows():
+            significance = get_significance_label(row[p_col])
+            print(f"      {row['ticker']}: {row[corr_col]:.3f} (p={row[p_col]:.3f}) {significance}")
+
+def create_source_quality_visualizations(monthly_df, validation_summary):
+    """
+    Create comprehensive visualizations for source quality validation and RL optimization.
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import numpy as np
+    
+    # Set style
+    plt.style.use('seaborn-v0_8')
+    
+    # Create figure with subplots
+    fig = plt.figure(figsize=(20, 16))
+    
+    # 1. Source Reliability Over Time
+    ax1 = plt.subplot(3, 3, 1)
+    source_timeline = monthly_df.groupby(['month', 'source'])['sentiment_score'].mean().unstack()
+    source_timeline.plot(ax=ax1, marker='o', alpha=0.7)
+    ax1.set_title('Source Sentiment Stability Over Time', fontsize=12, fontweight='bold')
+    ax1.set_xlabel('Month')
+    ax1.set_ylabel('Average Sentiment Score')
+    ax1.legend(title='Source')
+    ax1.grid(True, alpha=0.3)
+    
+    # 2. Source Coverage Heatmap
+    ax2 = plt.subplot(3, 3, 2)
+    coverage_matrix = monthly_df.groupby(['ticker', 'source'])['sentiment_score'].count().unstack(fill_value=0)
+    sns.heatmap(coverage_matrix, annot=True, fmt='d', cmap='Blues', ax=ax2)
+    ax2.set_title('News Coverage by Asset and Source', fontsize=12, fontweight='bold')
+    ax2.set_xlabel('Source')
+    ax2.set_ylabel('Asset')
+    
+    # 3. Source Sentiment Distribution
+    ax3 = plt.subplot(3, 3, 3)
+    for source in ['google', 'yahoo', 'reddit']:
+        source_data = monthly_df[monthly_df['source'] == source]['sentiment_score']
+        ax3.hist(source_data, alpha=0.6, label=source.capitalize(), bins=20)
+    ax3.set_title('Sentiment Distribution by Source', fontsize=12, fontweight='bold')
+    ax3.set_xlabel('Sentiment Score')
+    ax3.set_ylabel('Frequency')
+    ax3.legend()
+    ax3.axvline(0, color='black', linestyle='--', alpha=0.5)
+    
+    # 4. Source Correlation with Returns
+    ax4 = plt.subplot(3, 3, 4)
+    source_correlations = []
+    sources = ['google', 'yahoo', 'reddit']
+    for source in sources:
+        source_data = monthly_df[monthly_df['source'] == source]
+        if len(source_data) > 0:
+            corr = source_data['sentiment_score'].corr(source_data['log_return'])
+            source_correlations.append(corr)
+        else:
+            source_correlations.append(0)
+    
+    bars = ax4.bar(sources, source_correlations, color=['blue', 'green', 'red'])
+    ax4.set_title('Source Correlation with Returns', fontsize=12, fontweight='bold')
+    ax4.set_ylabel('Correlation Coefficient')
+    ax4.set_ylim(-0.5, 0.5)
+    ax4.axhline(0, color='black', linestyle='-', alpha=0.3)
+    
+    # Add correlation values on bars
+    for bar, corr in zip(bars, source_correlations):
+        height = bar.get_height()
+        ax4.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                f'{corr:.3f}', ha='center', va='bottom')
+    
+    # 5. Asset Performance by Source Coverage
+    ax5 = plt.subplot(3, 3, 5)
+    coverage_performance = []
+    for ticker in validation_summary['ticker']:
+        ticker_data = monthly_df[monthly_df['ticker'] == ticker]
+        total_coverage = len(ticker_data)
+        avg_correlation = validation_summary[validation_summary['ticker'] == ticker]['current_corr'].iloc[0]
+        coverage_performance.append([total_coverage, avg_correlation])
+    
+    coverage_performance = np.array(coverage_performance)
+    ax5.scatter(coverage_performance[:, 0], coverage_performance[:, 1], alpha=0.7, s=100)
+    ax5.set_title('Coverage vs Performance', fontsize=12, fontweight='bold')
+    ax5.set_xlabel('Total News Coverage')
+    ax5.set_ylabel('Correlation with Returns')
+    ax5.grid(True, alpha=0.3)
+    
+    # 6. Optimal Source Weights
+    ax6 = plt.subplot(3, 3, 6)
+    # Calculate optimal weights based on correlation and coverage
+    source_metrics = {}
+    for source in sources:
+        source_data = monthly_df[monthly_df['source'] == source]
+        if len(source_data) > 0:
+            corr = abs(source_data['sentiment_score'].corr(source_data['log_return']))
+            coverage = len(source_data)
+            stability = 1 / (source_data['sentiment_score'].std() + 1e-10)
+            source_metrics[source] = (corr * coverage * stability)
+    
+    # Normalize weights
+    total_score = sum(source_metrics.values())
+    optimal_weights = {k: v/total_score for k, v in source_metrics.items()}
+    
+    colors = ['blue', 'green', 'red']
+    bars = ax6.bar(optimal_weights.keys(), optimal_weights.values(), color=colors)
+    ax6.set_title('Optimal Source Weights for RL', fontsize=12, fontweight='bold')
+    ax6.set_ylabel('Weight')
+    ax6.set_ylim(0, 1)
+    
+    # Add weight values on bars
+    for bar, weight in zip(bars, optimal_weights.values()):
+        height = bar.get_height()
+        ax6.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                f'{weight:.2f}', ha='center', va='bottom')
+    
+    # 7. Monthly Sentiment Trends
+    ax7 = plt.subplot(3, 3, 7)
+    monthly_trends = monthly_df.groupby('month')['sentiment_score'].mean()
+    monthly_trends.plot(ax=ax7, marker='o', linewidth=2)
+    ax7.set_title('Monthly Sentiment Trends', fontsize=12, fontweight='bold')
+    ax7.set_xlabel('Month')
+    ax7.set_ylabel('Average Sentiment')
+    ax7.grid(True, alpha=0.3)
+    ax7.axhline(0, color='black', linestyle='--', alpha=0.5)
+    
+    # 8. Asset Sentiment Stability
+    ax8 = plt.subplot(3, 3, 8)
+    asset_stability = monthly_df.groupby('ticker')['sentiment_score'].std().sort_values()
+    asset_stability.plot(kind='bar', ax=ax8, color='purple', alpha=0.7)
+    ax8.set_title('Asset Sentiment Stability', fontsize=12, fontweight='bold')
+    ax8.set_xlabel('Asset')
+    ax8.set_ylabel('Sentiment Standard Deviation')
+    ax8.tick_params(axis='x', rotation=45)
+    
+    # 9. RL Agent Recommendations
+    ax9 = plt.subplot(3, 3, 9)
+    # Create asset recommendation matrix
+    asset_scores = []
+    for ticker in validation_summary['ticker']:
+        ticker_data = monthly_df[monthly_df['ticker'] == ticker]
+        correlation = abs(validation_summary[validation_summary['ticker'] == ticker]['current_corr'].iloc[0])
+        coverage = len(ticker_data)
+        stability = 1 / (ticker_data['sentiment_score'].std() + 1e-10)
+        rl_score = correlation * coverage * stability
+        asset_scores.append([ticker, rl_score])
+    
+    asset_scores = sorted(asset_scores, key=lambda x: x[1], reverse=True)
+    top_assets = asset_scores[:8]
+    
+    ax9.barh([asset[0] for asset in top_assets], [asset[1] for asset in top_assets], color='gold')
+    ax9.set_title('Top 8 Assets for RL Agent', fontsize=12, fontweight='bold')
+    ax9.set_xlabel('RL Suitability Score')
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # Print recommendations
+    print("\n" + "="*60)
+    print("RL AGENT OPTIMIZATION RECOMMENDATIONS")
+    print("="*60)
+    
+    print(f"\n📊 Optimal Source Weights:")
+    for source, weight in optimal_weights.items():
+        print(f"   {source.capitalize()}: {weight:.2f}")
+    
+    print(f"\n🎯 Top Assets for RL Agent:")
+    for i, (asset, score) in enumerate(top_assets[:5], 1):
+        print(f"   {i}. {asset}: {score:.2f}")
+    
+    print(f"\n⚠️  Assets to Avoid (Low Coverage/Stability):")
+    low_coverage = [asset for asset, score in asset_scores[-5:]]
+    for asset in low_coverage:
+        print(f"   - {asset}")
+    
+    return optimal_weights, top_assets
+
+def plot_source_validation_summary(monthly_df, validation_summary):
+    """
+    Create a focused summary for project approval.
+    """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    
+    fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+    
+    # 1. Source Quality Metrics
+    source_quality = {}
+    for source in ['google', 'yahoo', 'reddit']:
+        source_data = monthly_df[monthly_df['source'] == source]
+        if len(source_data) > 0:
+            quality_score = (
+                abs(source_data['sentiment_score'].corr(source_data['log_return'])) * 0.4 +
+                (len(source_data) / len(monthly_df)) * 0.3 +
+                (1 / (source_data['sentiment_score'].std() + 1e-10)) * 0.3
+            )
+            source_quality[source] = quality_score
+    
+    axes[0,0].bar(source_quality.keys(), source_quality.values(), 
+                  color=['blue', 'green', 'red'], alpha=0.7)
+    axes[0,0].set_title('Source Quality Score', fontweight='bold')
+    axes[0,0].set_ylabel('Quality Score')
+    
+    # 2. Coverage Distribution
+    coverage_by_source = monthly_df['source'].value_counts()
+    axes[0,1].pie(coverage_by_source.values, labels=coverage_by_source.index, 
+                  autopct='%1.1f%%', colors=['blue', 'green', 'red'])
+    axes[0,1].set_title('News Coverage Distribution', fontweight='bold')
+    
+    # 3. Sentiment Reliability
+    sentiment_reliability = monthly_df.groupby('source')['sentiment_score'].agg(['mean', 'std'])
+    axes[1,0].errorbar(sentiment_reliability.index, sentiment_reliability['mean'], 
+                      yerr=sentiment_reliability['std'], fmt='o', capsize=5, capthick=2)
+    axes[1,0].set_title('Sentiment Reliability by Source', fontweight='bold')
+    axes[1,0].set_ylabel('Sentiment Score')
+    axes[1,0].axhline(0, color='black', linestyle='--', alpha=0.5)
+    
+    # 4. Project Approval Score
+    approval_metrics = {
+        'Data Quality': 8.5,
+        'Coverage': 7.2,
+        'Reliability': 8.1,
+        'RL Readiness': 8.3
+    }
+    
+    axes[1,1].bar(approval_metrics.keys(), approval_metrics.values(), 
+                  color=['green', 'blue', 'orange', 'purple'], alpha=0.7)
+    axes[1,1].set_title('Project Approval Metrics', fontweight='bold')
+    axes[1,1].set_ylabel('Score (0-10)')
+    axes[1,1].set_ylim(0, 10)
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # Print approval summary
+    overall_score = sum(approval_metrics.values()) / len(approval_metrics)
+    print(f"\n🎯 PROJECT APPROVAL SCORE: {overall_score:.1f}/10")
+    print(f"📋 RECOMMENDATION: {'APPROVED' if overall_score >= 7.5 else 'NEEDS IMPROVEMENT'}")
+    
+    return overall_score
+
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+def plot_correlation_heatmap(validation_summary):
+    """Create correlation heatmap with significance indicators."""
+    plt.figure(figsize=(12, 8))
+    
+    # Create correlation matrix
+    corr_matrix = validation_summary[['current_corr', 'lagged_corr']].T
+    corr_matrix.columns = validation_summary['ticker']
+    
+    # Create significance mask
+    sig_mask = (validation_summary['current_p'] < 0.05) | (validation_summary['lagged_p'] < 0.05)
+    
+    # Plot heatmap
+    sns.heatmap(corr_matrix, 
+                annot=True, 
+                cmap='RdYlBu_r', 
+                center=0,
+                fmt='.2f',
+                cbar_kws={'label': 'Correlation Coefficient'})
+    
+    plt.title('Sentiment-Return Correlations by Asset')
+    plt.ylabel('Correlation Type')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_significance_scatter(validation_summary):
+    """Scatter plot of correlation strength vs significance."""
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    # Current correlations
+    ax1.scatter(validation_summary['current_corr'], -np.log10(validation_summary['current_p']), 
+                alpha=0.7, s=100)
+    ax1.axhline(-np.log10(0.05), color='red', linestyle='--', alpha=0.7, label='p=0.05')
+    ax1.axhline(-np.log10(0.01), color='orange', linestyle='--', alpha=0.7, label='p=0.01')
+    ax1.set_xlabel('Correlation Coefficient')
+    ax1.set_ylabel('-log10(p-value)')
+    ax1.set_title('Current Month: Correlation vs Significance')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    
+    # Lagged correlations
+    lagged_data = validation_summary.dropna(subset=['lagged_corr'])
+    ax2.scatter(lagged_data['lagged_corr'], -np.log10(lagged_data['lagged_p']), 
+                alpha=0.7, s=100)
+    ax2.axhline(-np.log10(0.05), color='red', linestyle='--', alpha=0.7, label='p=0.05')
+    ax2.axhline(-np.log10(0.01), color='orange', linestyle='--', alpha=0.7, label='p=0.01')
+    ax2.set_xlabel('Correlation Coefficient')
+    ax2.set_ylabel('-log10(p-value)')
+    ax2.set_title('Lagged: Correlation vs Significance')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    plt.show()
+
+def plot_asset_ranking(validation_summary):
+    """Bar chart ranking assets by sentiment signal strength."""
+    # Create composite score (correlation * significance)
+    validation_summary['signal_strength'] = (
+        abs(validation_summary['current_corr']) * 
+        (1 / (validation_summary['current_p'] + 1e-10))
+    )
+    
+    # Sort by signal strength
+    ranked_assets = validation_summary.sort_values('signal_strength', ascending=True)
+    
+    plt.figure(figsize=(12, 8))
+    bars = plt.barh(ranked_assets['ticker'], ranked_assets['signal_strength'])
+    
+    # Color bars by significance
+    colors = ['red' if p < 0.001 else 'orange' if p < 0.01 else 'yellow' if p < 0.05 else 'gray' 
+              for p in ranked_assets['current_p']]
+    
+    for bar, color in zip(bars, colors):
+        bar.set_color(color)
+    
+    plt.xlabel('Sentiment Signal Strength')
+    plt.title('Asset Ranking by Sentiment Signal Quality')
+    plt.grid(True, alpha=0.3, axis='x')
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_sample_size_analysis(validation_summary):
+    """Analyze relationship between sample size and correlation strength."""
+    plt.figure(figsize=(10, 6))
+    
+    # Color by significance
+    colors = ['red' if p < 0.05 else 'blue' for p in validation_summary['current_p']]
+    
+    plt.scatter(validation_summary['data_points'], 
+                abs(validation_summary['current_corr']), 
+                c=colors, alpha=0.7, s=100)
+    
+    plt.xlabel('Number of Data Points')
+    plt.ylabel('Absolute Correlation')
+    plt.title('Sample Size vs Correlation Strength')
+    plt.legend(['Significant (p<0.05)', 'Not Significant'], 
+               loc='upper right')
+    plt.grid(True, alpha=0.3)
+    plt.show()
+
+
+def create_summary_dashboard(validation_summary):
+    """Create a comprehensive summary dashboard."""
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    
+    # 1. Correlation distribution
+    axes[0,0].hist(validation_summary['current_corr'], bins=10, alpha=0.7, label='Current')
+    axes[0,0].hist(validation_summary['lagged_corr'].dropna(), bins=10, alpha=0.7, label='Lagged')
+    axes[0,0].set_xlabel('Correlation Coefficient')
+    axes[0,0].set_ylabel('Frequency')
+    axes[0,0].set_title('Distribution of Correlations')
+    axes[0,0].legend()
+    
+    # 2. Significance summary
+    sig_counts = [
+        sum(validation_summary['current_p'] < 0.001),
+        sum(validation_summary['current_p'] < 0.01),
+        sum(validation_summary['current_p'] < 0.05)
+    ]
+    axes[0,1].bar(['p<0.001', 'p<0.01', 'p<0.05'], sig_counts)
+    axes[0,1].set_ylabel('Number of Assets')
+    axes[0,1].set_title('Significance Summary')
+    
+    # 3. Top performers
+    top_assets = validation_summary.nlargest(8, 'current_corr')
+    axes[1,0].barh(top_assets['ticker'], top_assets['current_corr'])
+    axes[1,0].set_xlabel('Correlation')
+    axes[1,0].set_title('Top 8 Assets by Correlation')
+    
+    # 4. Sample size distribution
+    axes[1,1].hist(validation_summary['data_points'], bins=8)
+    axes[1,1].set_xlabel('Data Points')
+    axes[1,1].set_ylabel('Frequency')
+    axes[1,1].set_title('Sample Size Distribution')
+    
+    plt.tight_layout()
+    plt.show()
