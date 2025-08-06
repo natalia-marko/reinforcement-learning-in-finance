@@ -1,0 +1,38 @@
+# Core data science libraries
+pandas>=1.5.0
+numpy>=1.21.0
+matplotlib>=3.5.0
+seaborn>=0.11.0
+
+# Financial data
+yfinance>=0.2.0
+
+# Machine Learning & Reinforcement Learning
+scikit-learn>=1.1.0
+stable-baselines3>=1.8.0
+gymnasium>=0.28.0
+
+# Natural Language Processing
+transformers>=4.20.0
+torch>=1.12.0
+textblob>=0.17.0
+
+# API and web scraping
+requests>=2.28.0
+praw>=7.6.0
+gnews>=0.4.2
+
+# Utilities
+pathlib2>=2.3.0
+tqdm>=4.64.0
+python-dotenv>=0.19.0
+
+# Jupyter for notebooks
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# Optional: For enhanced visualization
+plotly>=5.0.0
+
+# Optional: For parallel processing
+joblib>=1.1.0 

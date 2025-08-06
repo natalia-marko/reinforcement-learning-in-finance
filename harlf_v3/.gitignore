@@ -1,0 +1,53 @@
+# Cache directories
+cache/
+*.cache
+
+# Model files and weights
+models/
+*.pkl
+*.h5
+*.pt
+*.pth
+
+# Output files
+outputs/
+*.csv
+*.json
+*.log
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# API keys and secrets
+.env
+*.key
+secrets.json
+
+# Large data files
+*.parquet
+*.hdf5
+*.feather
+
+# Temporary files
+*.tmp
+*.temp 
