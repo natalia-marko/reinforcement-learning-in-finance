@@ -1,0 +1,3 @@
+[submodule "harlf_v2_test_on_syntetic_data"]
+	path = harlf_v2_test_on_syntetic_data
+	url = ./harlf_v2_test_on_syntetic_data
