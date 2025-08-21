@@ -129,6 +129,76 @@ def calculate_technical_indicators(prices, returns):
 
 
 
+# Cell 3: Sentiment Analysis Setup
+def setup_sentiment_analysis():
+    """
+    Set up FinBERT for sentiment analysis as used in HARLF
+    """
+    print("Setting up FinBERT sentiment analysis...")
+    
+    try:
+        sentiment_analyzer = pipeline(
+            "sentiment-analysis",
+            model="ProsusAI/finbert",
+            tokenizer="ProsusAI/finbert",
+            device=0 if torch.cuda.is_available() else -1
+        )
+        print("✓ FinBERT loaded successfully")
+        return sentiment_analyzer
+    except Exception as e:
+        print(f"Error loading FinBERT: {e}")
+        # Fallback to a general financial sentiment model
+        try:
+            sentiment_analyzer = pipeline(
+                "sentiment-analysis",
+                model="yiyanghkust/finbert-tone"
+            )
+            print("✓ Using fallback FinBERT model")
+            return sentiment_analyzer
+        except Exception as e2:
+            print(f"Error loading fallback model: {e2}")
+            print("✓ Using mock sentiment analyzer for demonstration")
+            return None
+
+
+
+# Cell 4: Sentiment Data Collection
+def collect_sentiment_data(assets, technical_indicators):
+    """
+    Simulate sentiment data collection as described in HARLF Algorithm 1
+    In production, this would scrape Google News with date filters
+    """
+    print("Collecting sentiment data...")
+    
+    # Use the same date range as technical indicators to ensure alignment
+    date_range = technical_indicators.index
+    sentiment_data = pd.DataFrame(index=date_range, columns=assets.keys())
+    
+    # Simulate sentiment patterns based on market conditions
+    np.random.seed(42)  # For reproducibility
+    
+    for ticker in assets.keys():
+        # Create realistic sentiment patterns
+        base_sentiment = np.random.normal(0, 0.1, len(date_range))
+        
+        # Add market regime effects
+        for i, date in enumerate(date_range):
+            # Financial crisis effect (2008-2009)
+            if date.year in [2008, 2009]:
+                base_sentiment[i] -= 0.3
+            # COVID effect (2020)
+            elif date.year == 2020 and date.month in [3, 4]:
+                base_sentiment[i] -= 0.4
+            # Recovery periods
+            elif date.year in [2021, 2022]:
+                base_sentiment[i] += 0.2
+            
+        sentiment_data[ticker] = np.clip(base_sentiment, -1, 1)
+    
+    sentiment_data = sentiment_data.fillna(0)
+    print(f"Sentiment data shape: {sentiment_data.shape}")
+    return sentiment_data
+
 
 
 # Cell 5: NLP Features Creation
