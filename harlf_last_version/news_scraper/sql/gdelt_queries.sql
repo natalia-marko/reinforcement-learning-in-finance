@@ -1,12 +1,9 @@
--- HARLF Portfolio Sentiment Analysis - Quality Sources Only
--- This query extracts sentiment data from trusted financial news sources
--- for your portfolio assets using GDELT database
-
+-- Complete V2Tone query: Expanded sources + Your proven validation + All tickers
 WITH 
--- Step 1: Filter GDELT data for quality sources only (early filtering for efficiency)
+-- Step 1: Filter GDELT data with your proven validation logic
 gdelt_filtered AS (
   SELECT 
-    SAFE.PARSE_TIMESTAMP('%Y%m%d%H%M%S', CAST(DATE AS STRING)) AS ts,
+    DATE,
     LOWER(SourceCommonName) AS domain,
     DocumentIdentifier AS url,
     V2Tone,
@@ -14,49 +11,47 @@ gdelt_filtered AS (
     LOWER(IFNULL(V2Organizations, '')) AS orgs
   FROM `gdelt-bq.gdeltv2.gkg_partitioned`
   WHERE
-    _PARTITIONTIME BETWEEN TIMESTAMP('2015-01-01') AND TIMESTAMP('2025-08-01')
+    _PARTITIONTIME BETWEEN TIMESTAMP('2025-07-19') AND TIMESTAMP('2025-08-01')
     
-    -- Ensure valid tone data
+    -- Your complete V2Tone validation (proven approach)
     AND V2Tone IS NOT NULL
+    AND V2Tone != '0'
     AND ARRAY_LENGTH(SPLIT(V2Tone, ',')) >= 7
     AND ABS(SAFE_CAST(SPLIT(V2Tone, ',')[OFFSET(0)] AS FLOAT64)) <= 100
     AND SAFE_CAST(SPLIT(V2Tone, ',')[OFFSET(6)] AS INT64) >= 30  -- Min 30 words
     
-    -- QUALITY SOURCES ONLY - Filter at source for efficiency
+    -- Your SourceCommonName trick: Efficient source filtering
     AND REGEXP_REPLACE(LOWER(SourceCommonName), r'^www\.', '') IN (
-      -- Tier 1: Institutional-grade financial sources
       'reuters.com',
       'bloomberg.com',
       'wsj.com',
-      'ft.com',
-      'financialtimes.com',
-      
-      -- Tier 2: Professional financial media
+      'cnn.com',
+      'bbc.com',
+      'yahoo.com',
       'cnbc.com',
+      '4-traders.com',
       'marketwatch.com',
+      'seekingalpha.com',
       'barrons.com',
       'forbes.com',
-      'thestreet.com',
-      
-      -- Tier 3: Established business & financial platforms  
-      'finance.yahoo.com',
       'businessinsider.com',
-      'economist.com',
       'morningstar.com',
-      'seekingalpha.com',
       'investors.com',
       'fool.com',
-      
-      -- Tier 4: Major news outlets with strong business sections
       'nytimes.com',
       'washingtonpost.com',
-      'theguardian.com'
-    )
+      'theguardian.com',
+      'ft.com',
+      'financialtimes.com',
+      'thestreet.com',
+      'economist.com',
+      'foxbusiness.com',
+      'investing.com'
+      )
 ),
 
--- Step 2: Define ticker patterns for your HARLF portfolio
+-- Step 2: IMPROVED ticker patterns with better matching
 dictionary AS (
-  -- Your current portfolio assets
   SELECT 'RDDT' AS ticker, r'\b(reddit|reddit inc)\b' AS pattern UNION ALL
   SELECT 'NVDA', r'\b(nvidia|geforce|rtx|cuda|jensen huang)\b' UNION ALL
   SELECT 'SMR',  r'\b(nuscale|nuscale power|smr reactor)\b' UNION ALL
@@ -64,30 +59,34 @@ dictionary AS (
   SELECT 'MRVL', r'\b(marvell|marvell technology)\b' UNION ALL
   SELECT 'MSFT', r'\b(microsoft|azure|xbox|windows|satya nadella)\b' UNION ALL
   SELECT 'ASML', r'\b(asml|asml holding)\b' UNION ALL
-  SELECT 'AEM',  r'\b(agnico eagle|agnico eagle mines)\b' UNION ALL
+  SELECT 'AEM',  r'\b(agnico eagle|agnico eagle mines|agnico)\b' UNION ALL  -- IMPROVED
   SELECT 'AMD',  r'\b(amd|advanced micro devices|ryzen|epyc)\b' UNION ALL
-  SELECT 'VERU', r'\b(veru|veru inc)\b' UNION ALL
+  SELECT 'VERU', r'\b(veru|veru inc|veru pharmaceuticals)\b' UNION ALL  -- IMPROVED
   SELECT 'AI',   r'\b(c3\.ai|c3 ai|c3ai)\b' UNION ALL
   SELECT 'GOOGL', r'\b(google|alphabet|waymo|deepmind|sundar pichai)\b' UNION ALL
-  SELECT 'INGM', r'\b(inogen|inogen inc)\b' UNION ALL
+  SELECT 'INGM', r'\b(inogen|inogen inc|inogen medical)\b' UNION ALL  -- IMPROVED
   SELECT 'PLUG', r'\b(plug power|plug)\b' UNION ALL
-  SELECT 'IONQ', r'\b(ionq|ionq inc)\b' UNION ALL
-  SELECT 'RGTI', r'\b(rigetti|rigetti computing)\b' UNION ALL
-  SELECT 'ARBE', r'\b(arbe|arbe robotics)\b' UNION ALL
-  SELECT 'APP',  r'\b(applovin|app lovin)\b' UNION ALL
-  SELECT 'QBTS', r'\b(d-wave|dwave|d\-wave systems)\b' UNION ALL
-  SELECT 'PLTR', r'\b(palantir|alex karp)\b'
+  SELECT 'IONQ', r'\b(ionq|ionq inc|ionq quantum)\b' UNION ALL  -- IMPROVED
+  SELECT 'RGTI', r'\b(rigetti|rigetti computing|rigetti quantum)\b' UNION ALL  -- IMPROVED
+  SELECT 'ARBE', r'\b(arbe|arbe robotics|arbe systems)\b' UNION ALL  -- IMPROVED
+  SELECT 'APP',  r'\b(applovin|app lovin|applovin corp)\b' UNION ALL  -- IMPROVED
+  SELECT 'QBTS', r'\b(d-wave|dwave|d\-wave systems|dwave quantum)\b' UNION ALL  -- IMPROVED
+  SELECT 'QQQ', r'\b(qqq|nasdaq|nasdaq-100|nasdaq 100)\b' UNION ALL  -- IMPROVED
+  SELECT 'SPY', r'\b(spy|spdr|s&p 500|s&p500|standard & poor)\b' UNION ALL  -- IMPROVED
+  SELECT 'PLTR', r'\b(palantir|alex karp|palantir technologies)\b'  -- IMPROVED
 ),
--- Step 3: Match articles to tickers
+
+-- Step 3: Match articles to tickers (your proven approach)
 tagged_articles AS (
   SELECT
     d.ticker,
     g.url,
     g.domain,
-    EXTRACT(YEAR FROM g.ts) AS year,
-    EXTRACT(MONTH FROM g.ts) AS month,
+    g.DATE,
+    EXTRACT(YEAR FROM SAFE.PARSE_TIMESTAMP('%Y%m%d%H%M%S', CAST(g.DATE AS STRING))) AS year,
+    EXTRACT(MONTH FROM SAFE.PARSE_TIMESTAMP('%Y%m%d%H%M%S', CAST(g.DATE AS STRING))) AS month,
     
-    -- Sentiment scores from GDELT
+    -- Sentiment scores from GDELT (your proven approach)
     SAFE_CAST(SPLIT(g.V2Tone, ',')[OFFSET(0)] AS FLOAT64) AS tone,
     SAFE_CAST(SPLIT(g.V2Tone, ',')[OFFSET(1)] AS FLOAT64) AS positive,
     SAFE_CAST(SPLIT(g.V2Tone, ',')[OFFSET(2)] AS FLOAT64) AS negative,
@@ -103,7 +102,7 @@ tagged_articles AS (
     )
 ),
 
--- Step 4: Aggregate monthly sentiment
+-- Step 4: Monthly aggregation with your confidence levels
 monthly_sentiment AS (
   SELECT
     ticker,
@@ -120,7 +119,7 @@ monthly_sentiment AS (
     -- Calculate FinBERT-style sentiment score [-1, 1]
     (AVG(positive) - AVG(negative)) / 100 AS finbert_sentiment,
     
-    -- Confidence metric based on article volume
+    -- Your confidence metric based on article volume
     CASE 
       WHEN COUNT(*) >= 50 THEN 'high'
       WHEN COUNT(*) >= 20 THEN 'medium'
@@ -137,43 +136,10 @@ monthly_sentiment AS (
   FROM tagged_articles
   WHERE ticker IS NOT NULL
   GROUP BY ticker, year, month
-  HAVING COUNT(*) >= 7  -- Minimum threshold for reliability
-),
-
--- Step 5: Add coverage statistics
-final_with_stats AS (
-  SELECT
-    ticker,
-    year,
-    month,
-    article_count,
-    tone_mean,
-    tone_std,
-    positive_mean,
-    negative_mean,
-    finbert_sentiment,
-    confidence_level,
-    
-    -- Add percentile ranks for context
-    PERCENT_RANK() OVER (
-      PARTITION BY ticker 
-      ORDER BY article_count
-    ) AS coverage_percentile,
-    
-    -- Add sentiment volatility flag
-    CASE 
-      WHEN tone_std > 10 THEN 'high_volatility'
-      WHEN tone_std > 5 THEN 'moderate_volatility'
-      ELSE 'stable'
-    END AS sentiment_volatility,
-    
-    sample_urls,
-    sources_used
-    
-  FROM monthly_sentiment
+  HAVING COUNT(*) >= 7  -- Your minimum threshold for reliability
 )
 
--- Final output
+-- Final output with all your metrics
 SELECT 
   ticker,
   year,
@@ -184,10 +150,7 @@ SELECT
   ROUND(negative_mean, 2) AS negative_mean,
   ROUND(finbert_sentiment, 3) AS finbert_sentiment,
   confidence_level,
-  sentiment_volatility,
-  ROUND(coverage_percentile, 2) AS coverage_percentile,
   sample_urls,
   sources_used
-FROM final_with_stats
+FROM monthly_sentiment
 ORDER BY ticker, year, month;
- 
