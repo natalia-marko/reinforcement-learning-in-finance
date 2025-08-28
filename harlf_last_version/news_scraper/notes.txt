@@ -1,5 +1,4 @@
 WITH 
--- Step 1: Filter GDELT data (pruned + validated)
 gdelt_filtered AS (
   SELECT 
     g.DATE,

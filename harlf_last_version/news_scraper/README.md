@@ -1,6 +1,7 @@
 # News Scraper - Financial Sentiment Analysis System
 
 A comprehensive financial news sentiment analysis system focused on portfolio-specific sentiment extraction from GDELT Global Knowledge Graph (GKG) data, with extensible architecture for additional news sources.
+**Raw GDELT → v_gkg_clean (cleaned) → v_tagged_articles (ticker mapping) → monthly_sentiment (aggregates)**
 
 ## Project Overview
 
@@ -43,31 +44,7 @@ news_scraper/
 - **Source Validation**: Domain-based quality scoring and filtering
 - **Statistical Testing**: Comprehensive statistical analysis with effect size calculations
 
-## Portfolio Assets
 
-The system analyzes sentiment for the following portfolio (quantities in `data/portfolio_holdings.csv`):
-
-**Core Holdings:**
-- NVDA (133 shares) - NVIDIA Corporation
-- RDDT (200 shares) - Reddit Inc
-- SMR (145 shares) - NuScale Power Corporation
-- RGTI (675 shares) - Rigetti Computing Inc
-- PLTR (40 shares) - Palantir Technologies Inc
-
-**Technology Stocks:**
-- MSFT (20 shares) - Microsoft Corporation
-- AMD (30 shares) - Advanced Micro Devices Inc
-- GOOGL (16 shares) - Alphabet Inc
-- MU (50 shares) - Micron Technology Inc
-- MRVL (80 shares) - Marvell Technology Inc
-
-**Emerging Tech:**
-- AI (315 shares) - C3.ai Inc
-- IONQ (108 shares) - IonQ Inc
-- QBTS (620 shares) - D-Wave Quantum Inc
-- ARBE (3050 shares) - Arbe Robotics Ltd
-- APP (16 shares) - AppLovin Corporation
-- ASML (6 shares) - ASML Holding NV
 
 ## Data Sources and Quality
 

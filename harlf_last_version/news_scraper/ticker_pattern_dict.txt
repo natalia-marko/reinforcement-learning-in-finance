@@ -1,0 +1,46 @@
+-- Improved dictionary CTE (BigQuery, RE2 regex; no lookarounds used)
+dictionary AS (
+  SELECT 'RDDT' AS ticker, r'(?i)(\$?RDDT\b|\breddit(?:\s+inc|\s+ipo)?\b)' AS pattern UNION ALL
+
+  SELECT 'NVDA', r'(?i)(\$?NVDA\b|\bnvidia\b(?:[\W_]+(?:geforce|rtx|cuda|blackwell|h100|h200|b200|gh200|dgx|grace(?:\s+hopper)?))?|\bjensen\W+huang\b)' UNION ALL
+
+  SELECT 'SMR',  r'(?i)(\$?SMR\b|\bnuscale(?:\s+power)?\b|\bsmr\s+reactor\b|\bsmall\s+modular\s+reactor\b)' UNION ALL
+
+  SELECT 'MU',   r'(?i)(\$?MU\b|\bmicron(?:\s+technology)?\b)' UNION ALL
+
+  SELECT 'MRVL', r'(?i)(\$?MRVL\b|\bmarvell(?:\s+technology)?\b)' UNION ALL
+
+  SELECT 'MSFT', r'(?i)(\$?MSFT\b|\bmicrosoft\b(?:[\W_]+(?:azure|copilot|xbox|windows))?|\bsatya\s+nadella\b)' UNION ALL
+
+  SELECT 'ASML', r'(?i)(\$?ASML\b|\basml\b(?:[\W_]+(?:holding|euv|high[\- ]?na|lithography))?)' UNION ALL
+
+  SELECT 'AEM',  r'(?i)(\$?AEM\b|\bagnico(?:\s+eagle(?:\s+mines)?)?\b)' UNION ALL
+
+  SELECT 'AMD',  r'(?i)(\$?AMD\b|\badvanced\s+micro\s+devices\b|\bryzen\b|\bepyc\b)' UNION ALL
+
+  SELECT 'VERU', r'(?i)(\$?VERU\b|\bveru\b(?:\s+inc|\s+pharmaceuticals)?)' UNION ALL
+
+  SELECT 'AI',   r'(?i)(\$?AI\b|\bc3\.?ai\b)' UNION ALL  -- "AI" is extremely ambiguous; keep to cashtag or "C3.ai"
+
+  SELECT 'GOOGL', r'(?i)(\$?GOOGL\b|\$?GOOG\b|\bgoogle\b|\bgoogle\s+cloud\b|\balphabet\b|\bwaymo\b|\bdeepmind\b|\bsundar\s+pichai\b)' UNION ALL
+
+  SELECT 'INGM', r'(?i)(\$?INGM\b|\binogen\b(?:\s+inc|\s+medical)?)' UNION ALL
+
+  SELECT 'PLUG', r'(?i)(\$?PLUG\b|\bplug\s+power\b)' UNION ALL  -- drop plain "plug" to avoid noise
+
+  SELECT 'IONQ', r'(?i)(\$?IONQ\b|\bionq\b(?:\s+inc|\s+quantum)?)' UNION ALL
+
+  SELECT 'RGTI', r'(?i)(\$?RGTI\b|\brigetti\b(?:\s+computing|\s+quantum)?)' UNION ALL
+
+  SELECT 'ARBE', r'(?i)(\$?ARBE\b|\barbe\b(?:\s+robotics|\s+systems)?)' UNION ALL
+
+  SELECT 'APP',  r'(?i)(\$?APP\b|\bapp\s*lovin\b|\bapplovin\b|\bapplovin\s+corp\b)' UNION ALL  -- avoid generic "app"
+
+  SELECT 'QBTS', r'(?i)(\$?QBTS\b|\bd-?wave\b(?:\s+systems|\s+quantum)?)' UNION ALL
+
+  SELECT 'QQQ',  r'(?i)(\$?QQQ\b|\bnasdaq[-\s]?100\b|\binvesco\s+qqq\b)' UNION ALL  -- remove plain "nasdaq"
+
+  SELECT 'SPY',  r'(?i)(\$?SPY\b|\bspdr\b|\bs&P\s*500\b|\bstandard\s*&\s*poor\b)' UNION ALL
+
+  SELECT 'PLTR', r'(?i)(\$?PLTR\b|\bpalantir(?:\s+technolog(?:y|ies))?\b|\balex\s+karp\b|\bpalantir\s+(?:gotham|foundry|apollo)\b)'
+)
