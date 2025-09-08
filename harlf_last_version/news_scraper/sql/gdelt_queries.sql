@@ -1,24 +1,104 @@
+-- File: sql/gdelt_monthly_sentiment_orgs_only.sql
+-- Purpose: Maximum precision for company sentiment (only orgs match, de-dup by content signature)
+
 WITH 
--- Step 1: Filter GDELT data (pruned + validated)
-gdelt_filtered AS (
+params AS (
+  SELECT [
+    'reuters.com', 'bloomberg.com', 'wsj.com', 'financialtimes.com', 'cnbc.com',
+    'marketwatch.com', 'ft.com', 'nytimes.com', 'finance.yahoo.com', 'seekingalpha.com', 'zacks.com', 'benzinga.com', 'investing.com', 'finviz.com', 'techcrunch.com', 'venturebeat.com', 'theverge.com',
+    'thestreet.com', 'morningstar.com', 'bnnbloomberg.ca', 'mining.com',
+    'prnewswire.com', 'globenewswire.com', 'fool.com', 'marketscreener.com', 'earnings.com'
+  ] AS trusted_domains
+),
+dictionary AS (
+  SELECT 'aem'  AS ticker, r'\bagnico eagle\b|\baem\b|\baem inc\b' AS pattern UNION ALL
+  SELECT 'rddt' AS ticker, r'\breddit\b|\brddt\b' AS pattern UNION ALL
+  SELECT 'nvda', r'\bnvidia\b|\bnvda\b|\bcuda\b|\bgeforce\b' UNION ALL
+  SELECT 'smr', r'\bnuscale\b|\bsmr\b|\bvoygr\b|\bsmall modular reactor\b' UNION ALL
+  SELECT 'rgti', r'\brigetti\b|\brgti\b' UNION ALL
+  SELECT 'mu', r'\bmicron\b|\bmu\b|\bmicron technology\b' UNION ALL
+  SELECT 'amd', r'\bamd\b|\badvanced micro devices\b|\bryzen\b|\bepyc\b|\bradeon\b' UNION ALL
+  SELECT 'app', r'\bapplovin\b|\bapp[- ]lovin\b|\bapplovin corp\b' UNION ALL
+  SELECT 'mrvl', r'\bmarvell\b|\bmrvl\b' UNION ALL
+  SELECT 'msft', r'\bmicrosoft\b|\bmsft\b|\bazure\b' UNION ALL
+  SELECT 'qbts', r'\bqbts\b|\bd[- ]?wave\b' UNION ALL
+  SELECT 'pltr', r'\bpalantir\b|\bpltr\b' UNION ALL
+  SELECT 'app' , r'\bapplovin\b|\bapp[- ]lovin\b|\bapplovin corp\b' UNION ALL
+  SELECT 'asml', r'\basml\b|\blithograph\w*\b|\beuv\b' UNION ALL
+  SELECT 'goog', r'\bgoogle\b|\balphabet\b|\bgoog\b|\bgoogle cloud\b' UNION ALL
+  SELECT 'ionq', r'\bionq\b|\bionq aria\b|\bionq forte\b' UNION ALL
+  SELECT 'veru', r'\bveru\b|\bveru inc\b|\bveru pharmaceuticals\b' UNION ALL
+  SELECT 'ai', r'\bc3\.?ai\b|\bc3 ai\b|\bthomas siebel\b' UNION ALL
+  SELECT 'arbe', r'\barbe\b|\barbe robotics\b|\barbe radar\b' UNION ALL
+  SELECT 'qqq', r'\binvesco qqq\b|\bqqq etf\b|\bnasdaq[- ]?100 etf\b|\bnasdaq 100 etf\b'
+),
+gdelt_raw AS (
   SELECT 
-    g.DATE,
-    PARSE_TIMESTAMP('%Y%m%d%H%M%S', CAST(g.DATE AS STRING)) AS ts,
-    REGEXP_REPLACE(LOWER(COALESCE(NET.HOST(DocumentIdentifier), SourceCommonName)),
-                   r'^(www|m|amp)\.', '') AS domain,
-    LOWER(DocumentIdentifier) AS url,            -- raw url (lower)
-    LOWER(IFNULL(V2Organizations, '')) AS orgs,  -- org mentions
+    PARSE_TIMESTAMP('%Y%m%d%H%M%S', CAST(DATE AS STRING)) AS ts,
+    REGEXP_REPLACE(
+      LOWER(COALESCE(REGEXP_EXTRACT(DocumentIdentifier, r'https?://([^/]+)'), SourceCommonName, '')),
+      r'^(www|m|amp)\.', ''
+    ) AS domain,
+    LOWER(DocumentIdentifier) AS url,
+    LOWER(IFNULL(V2Organizations, '')) AS orgs,
     V2Tone
-  FROM `gdelt-bq.gdeltv2.gkg_partitioned` g
-  WHERE
-    _PARTITIONTIME >= TIMESTAMP('2015-02-19')
-    AND _PARTITIONTIME <  TIMESTAMP('2025-08-02')                      -- half-open
+  FROM `gdelt-bq.gdeltv2.gkg_partitioned`
+  WHERE DATE >= 20150101000000
+    AND DATE <= 20300101000000
     AND V2Tone IS NOT NULL
-    AND V2Tone != '0'
-    AND ARRAY_LENGTH(SPLIT(V2Tone, ',')) >= 7
-    AND ABS(SAFE_CAST(SPLIT(V2Tone, ',')[OFFSET(0)] AS FLOAT64)) <= 100
-    AND SAFE_CAST(SPLIT(V2Tone, ',')[OFFSET(6)] AS INT64) >= 30        -- ≥30 words
-    AND REGEXP_REPLACE(LOWER(COALESCE(NET.HOST(DocumentIdentifier), SourceCommonName)),
+),
+candidates AS (
+  SELECT
+    d.ticker,
+    r.ts,
+    r.domain,
+    r.url,
+    r.orgs,
+    r.V2Tone,
+    SAFE_CAST(SPLIT(r.V2Tone, ',')[OFFSET(0)] AS FLOAT64) AS tone,
+    SAFE_CAST(SPLIT(r.V2Tone, ',')[OFFSET(1)] AS FLOAT64) AS positive,
+    SAFE_CAST(SPLIT(r.V2Tone, ',')[OFFSET(2)] AS FLOAT64) AS negative,
+    SAFE_CAST(SPLIT(r.V2Tone, ',')[OFFSET(6)] AS INT64)   AS word_count,
+    -- Content signature for deduplication: canonical url + orgs + tone snippet
+    TO_HEX(SHA256(CONCAT(
+      LOWER(REGEXP_REPLACE(r.url, r'(\?.*|#.*)$', '')),
+      '||',
+      LOWER(SUBSTR(COALESCE(r.orgs,''),1,300)),
+      '||',
+      SUBSTR(SAFE_CAST(SPLIT(r.V2Tone, ',')[OFFSET(0)] AS STRING), 1, 16)
+    ))) AS content_sig
+  FROM gdelt_raw r
+  JOIN dictionary d ON REGEXP_CONTAINS(r.orgs, d.pattern)
+  WHERE r.domain IN UNNEST((SELECT trusted_domains FROM params))
+    AND SAFE_CAST(SPLIT(r.V2Tone, ',')[OFFSET(6)] AS INT64) >= 30
+),
+-- Deduplicate by (ticker, content_sig): keep latest ts per unique content
+candidates_dedup AS (
+  SELECT *
+  FROM (
+    SELECT *, ROW_NUMBER() OVER (PARTITION BY ticker, content_sig ORDER BY ts DESC) AS rn
+    FROM candidates
+  )
+  WHERE rn = 1
+),
+monthly_sentiment AS (
+  SELECT
+    ticker,
+    EXTRACT(YEAR FROM ts) AS year,
+    EXTRACT(MONTH FROM ts) AS month,
+    COUNT(*) AS article_count,
+    AVG(positive - negative) AS mean_signed_score,
+    AVG(tone) AS mean_tone
+  FROM candidates_dedup
+  GROUP BY ticker, year, month
+)
+SELECT *
+FROM monthly_sentiment
+ORDER BY ticker, year, month;
+
+
+
+
                        r'^(www|m|amp)\.', '') IN (
       'reuters.com','bloomberg.com','wsj.com','cnn.com','bbc.com','yahoo.com',
       'cnbc.com','4-traders.com','marketwatch.com','seekingalpha.com','barrons.com',
