@@ -4,10 +4,9 @@ import time
 import pandas as pd
 from urllib.parse import urlparse
 
-try:
-    import praw
-except Exception:
-    praw = None
+
+import praw
+
 
 def _praw_client(client_id=None, client_secret=None, user_agent=None):
     if praw is None:

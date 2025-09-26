@@ -41,11 +41,10 @@ def collect_price_data(ASSETS, TRAIN_START, TEST_END):
             continue
     
     # Handle missing data
-    price_data = price_data.fillna(method='ffill').fillna(method='bfill').round(2)
-    
+    price_data = price_data.ffill().bfill().round(2)
     # Calculate log returns and resample to monthly
     log_returns = np.log(price_data / price_data.shift(1)).dropna()
-    monthly_prices = price_data.resample('M').last().round(2)
+    monthly_prices = price_data.resample('ME').last().round(2)
     monthly_log_returns = np.log(monthly_prices / monthly_prices.shift(1)).dropna().round(2)
     
     print(f"Data collected: {monthly_log_returns.shape}")
@@ -127,127 +126,234 @@ def calculate_technical_indicators(prices, returns):
     return normalized_indicators.round(4)
 
 
-
-
-# Cell 3: Sentiment Analysis Setup
-def setup_sentiment_analysis():
+def load_real_gdelt_sentiment(assets, date_range):
     """
-    Set up FinBERT for sentiment analysis as used in HARLF
+    Load real GDELT v2tone sentiment data with proper date alignment
     """
-    print("Setting up FinBERT sentiment analysis...")
+    print("Loading real GDELT sentiment data...")
     
     try:
-        sentiment_analyzer = pipeline(
-            "sentiment-analysis",
-            model="ProsusAI/finbert",
-            tokenizer="ProsusAI/finbert",
-            device=0 if torch.cuda.is_available() else -1
-        )
-        print("✓ FinBERT loaded successfully")
-        return sentiment_analyzer
+        # Load GDELT data
+        gdelt_data = pd.read_csv('v2tone_2015_2025.csv')
+        reddit_data = pd.read_csv('reddit_monthly_sentiment.csv')
+        
+        # Convert date columns to datetime
+        gdelt_data['month'] = pd.to_datetime(gdelt_data['month'])
+        reddit_data['month'] = pd.to_datetime(reddit_data['month'])
+        
+        # Create sentiment data DataFrame
+        sentiment_data = pd.DataFrame(index=date_range, columns=assets.keys())
+        
+        # Process each asset
+        for ticker in assets.keys():
+            ticker_lower = ticker.lower()
+            ticker_upper = ticker.upper()
+            
+            # Get GDELT data for this ticker
+            gdelt_ticker = gdelt_data[gdelt_data['ticker'] == ticker_lower]
+            reddit_ticker = reddit_data[reddit_data['ticker'] == ticker_upper]
+            
+            if not gdelt_ticker.empty:
+                gdelt_ticker = gdelt_ticker.set_index('month')['weighted_tone']
+                # Normalize GDELT tone from [-10, 10] to [-1, 1]
+                gdelt_ticker = gdelt_ticker / 10.0
+                gdelt_ticker = np.clip(gdelt_ticker, -1, 1)
+            
+            if not reddit_ticker.empty:
+                reddit_ticker = reddit_ticker.set_index('month')['sent_ew_weighted']
+            
+            # Align with our date range (month-end dates)
+            for date in date_range:
+                # Convert month-end date to month-start for GDELT lookup
+                month_start = date.replace(day=1)
+                
+                # Try GDELT data first
+                if not gdelt_ticker.empty and month_start in gdelt_ticker.index:
+                    sentiment_data.loc[date, ticker] = gdelt_ticker.loc[month_start]
+                # Try Reddit data as fallback
+                elif not reddit_ticker.empty and month_start in reddit_ticker.index:
+                    sentiment_data.loc[date, ticker] = reddit_ticker.loc[month_start]
+                else:
+                    sentiment_data.loc[date, ticker] = 0  # Neutral if no data
+        
+        # Fill any remaining NaN values with 0
+        sentiment_data = sentiment_data.fillna(0)
+        
+        print(f"Sentiment data loaded: {sentiment_data.shape}")
+        print(f"Non-zero values: {(sentiment_data != 0).sum().sum()}")
+        
+        return sentiment_data
+        
     except Exception as e:
-        print(f"Error loading FinBERT: {e}")
-        # Fallback to a general financial sentiment model
-        try:
-            sentiment_analyzer = pipeline(
-                "sentiment-analysis",
-                model="yiyanghkust/finbert-tone"
-            )
-            print("✓ Using fallback FinBERT model")
-            return sentiment_analyzer
-        except Exception as e2:
-            print(f"Error loading fallback model: {e2}")
-            print("✓ Using mock sentiment analyzer for demonstration")
-            return None
+        print(f"Error loading sentiment data: {e}")
+        # Fallback to neutral sentiment
+        return pd.DataFrame(0, index=date_range, columns=assets.keys())
 
-
-
-# Cell 4: Sentiment Data Collection
 def collect_sentiment_data(assets, technical_indicators):
     """
-    Simulate sentiment data collection as described in HARLF Algorithm 1
+    Load real GDELT + Reddit sentiment data
     """
-    print("Collecting sentiment data...")
-    
-    # Use the same date range as technical indicators to ensure alignment
+    print("Collecting real sentiment data...")
     date_range = technical_indicators.index
-    sentiment_data = pd.DataFrame(index=date_range, columns=assets.keys())
-    
-    # Simulate sentiment patterns based on market conditions
-    np.random.seed(42)  # For reproducibility
-    
-    for ticker in assets.keys():
-        # Create realistic sentiment patterns
-        base_sentiment = np.random.normal(0, 0.1, len(date_range))
-        
-        # Add market regime effects
-        for i, date in enumerate(date_range):
-            # Financial crisis effect (2008-2009)
-            if date.year in [2008, 2009]:
-                base_sentiment[i] -= 0.3
-            # COVID effect (2020)
-            elif date.year == 2020 and date.month in [3, 4]:
-                base_sentiment[i] -= 0.4
-            # Recovery periods
-            elif date.year in [2021, 2022]:
-                base_sentiment[i] += 0.2
-            
-        sentiment_data[ticker] = np.clip(base_sentiment, -1, 1)
-    
-    sentiment_data = sentiment_data.fillna(0)
-    print(f"Sentiment data shape: {sentiment_data.shape}")
-    return sentiment_data
+    return load_real_gdelt_sentiment(assets, date_range)
 
 
 
 # Cell 5: NLP Features Creation
-def create_nlp_features(sentiment_data, technical_indicators):
+def create_technical_features(technical_indicators):
     """
-    Create NLP-driven observation vectors as described in Section 3.2
-    Combines volatility and sentiment scores
+    Create features for TECHNICAL AGENT (pure quantitative analysis)
+    Uses all technical indicators: Sharpe, Sortino, Calmar ratios, volatility, correlations
     """
-    print("Creating NLP-driven features...")
+    print("Creating technical features for numerical agent...")
     
-    # Ensure both datasets have the same index
-    common_dates = sentiment_data.index.intersection(technical_indicators.index)
-    sentiment_data = sentiment_data.loc[common_dates]
-    technical_indicators_aligned = technical_indicators.loc[common_dates]
+    features = technical_indicators.copy()
     
-    nlp_features = pd.DataFrame(index=common_dates)
-    
-    # Extract volatility features from technical indicators
-    volatility_cols = [col for col in technical_indicators_aligned.columns if 'volatility' in col]
-    
-    for date in common_dates:
-        feature_vector = []
-        
-        # Add volatility vector
-        vol_values = technical_indicators_aligned.loc[date, volatility_cols].values
-        feature_vector.extend(vol_values)
-        
-        # Add sentiment score vector
-        sentiment_values = sentiment_data.loc[date].values
-        feature_vector.extend(sentiment_values)
-        
-        # Store combined feature vector
-        for i, val in enumerate(feature_vector):
-            nlp_features.loc[date, f'nlp_feature_{i}'] = val
-    
-    # Normalize features
-    min_vals = nlp_features.min()
-    max_vals = nlp_features.max()
+    # Normalize to [0,1] range
+    min_vals = features.min()
+    max_vals = features.max()
     range_vals = max_vals - min_vals
     
-    normalized_features = nlp_features.copy()
-    for col in nlp_features.columns:
+    normalized_features = features.copy()
+    for col in features.columns:
         if range_vals[col] != 0:
-            normalized_features[col] = (nlp_features[col] - min_vals[col]) / range_vals[col]
+            normalized_features[col] = (features[col] - min_vals[col]) / range_vals[col]
         else:
-            normalized_features[col] = 0.5
+            normalized_features[col] = 0.5  # Neutral for constant features
     
     normalized_features = normalized_features.fillna(0)
-    print(f"NLP features shape: {normalized_features.shape}")
+    print(f"Technical features shape: {normalized_features.shape}")
     return normalized_features
+
+def create_sentiment_features(sentiment_data, monthly_returns=None, monthly_prices=None, mode='sentiment_logret'):
+    """
+    Create features for SENTIMENT AGENT (news/social media driven)
+    
+    Modes:
+    - 'sentiment_logret': Sentiment + Log Returns (recommended)
+    - 'sentiment_momentum': Sentiment + Price Momentum  
+    - 'sentiment_only': Pure sentiment signals
+    """
+    print(f"Creating sentiment features (mode: {mode})...")
+    
+    if mode == 'sentiment_logret' and monthly_returns is not None:
+        # Option 1: Sentiment + Log Returns
+        log_returns = np.log(1 + monthly_returns).fillna(0)
+        common_dates = sentiment_data.index.intersection(log_returns.index)
+        
+        sentiment_aligned = sentiment_data.loc[common_dates]
+        log_returns_aligned = log_returns.loc[common_dates]
+        
+        features = pd.concat([sentiment_aligned, log_returns_aligned], axis=1)
+        features.columns = [f'sent_{col}' for col in sentiment_aligned.columns] + [f'logret_{col}' for col in log_returns_aligned.columns]
+        
+    elif mode == 'sentiment_momentum' and monthly_prices is not None:
+        # Option 2: Sentiment + Price Momentum
+        price_momentum = monthly_prices.pct_change(1).fillna(0)
+        common_dates = sentiment_data.index.intersection(price_momentum.index)
+        
+        sentiment_aligned = sentiment_data.loc[common_dates]
+        momentum_aligned = price_momentum.loc[common_dates]
+        
+        features = pd.concat([sentiment_aligned, momentum_aligned], axis=1)
+        features.columns = [f'sent_{col}' for col in sentiment_aligned.columns] + [f'momentum_{col}' for col in momentum_aligned.columns]
+        
+    elif mode == 'sentiment_only':
+        # Option 3: Pure sentiment
+        features = sentiment_data.copy()
+        
+    else:
+        raise ValueError(f"Invalid mode '{mode}' or missing required data")
+    
+    # Normalize to [0,1] range
+    min_vals = features.min()
+    max_vals = features.max()
+    range_vals = max_vals - min_vals
+    
+    normalized_features = features.copy()
+    for col in features.columns:
+        if range_vals[col] != 0:
+            normalized_features[col] = (features[col] - min_vals[col]) / range_vals[col]
+        else:
+            normalized_features[col] = 0.5  # Neutral for constant features
+    
+    normalized_features = normalized_features.fillna(0)
+    print(f"Sentiment features shape: {normalized_features.shape}")
+    return normalized_features
+
+def create_conditional_sentiment_features(sentiment_data, monthly_returns, correlation_threshold=0.1):
+    """
+    Create sentiment features that only include assets where sentiment correlates with returns
+    This creates a smarter sentiment agent that focuses on meaningful signals
+    """
+    print(f"Creating conditional sentiment features (threshold: {correlation_threshold})...")
+    
+    # Calculate correlations between sentiment and returns
+    correlations = {}
+    significant_assets = []
+    
+    for asset in sentiment_data.columns:
+        if asset in monthly_returns.columns:
+            # Calculate correlation, handling NaN values
+            valid_mask = ~(sentiment_data[asset].isna() | monthly_returns[asset].isna())
+            if valid_mask.sum() > 10:  # Need at least 10 valid observations
+                corr = sentiment_data[asset][valid_mask].corr(monthly_returns[asset][valid_mask])
+                if not pd.isna(corr) and abs(corr) > correlation_threshold:
+                    correlations[asset] = corr
+                    significant_assets.append(asset)
+    
+    print(f"Assets with significant sentiment-return correlation:")
+    print(f"  Count: {len(significant_assets)}/{len(sentiment_data.columns)}")
+    print(f"  Assets: {significant_assets}")
+    for asset in significant_assets:
+        print(f"    {asset}: {correlations[asset]:.4f}")
+    
+    if not significant_assets:
+        print("Warning: No assets with significant correlations found. Using all sentiment data.")
+        significant_assets = list(sentiment_data.columns)
+    
+    # Create features using only significant assets
+    # Option 1: Sentiment + Log Returns for significant assets only
+    log_returns = np.log(1 + monthly_returns).fillna(0)
+    
+    # Align dates
+    common_dates = sentiment_data.index.intersection(log_returns.index)
+    sentiment_aligned = sentiment_data.loc[common_dates]
+    log_returns_aligned = log_returns.loc[common_dates]
+    
+    # Select only significant assets
+    sentiment_significant = sentiment_aligned[significant_assets]
+    log_returns_significant = log_returns_aligned[significant_assets]
+    
+    # Combine features
+    features = pd.concat([sentiment_significant, log_returns_significant], axis=1)
+    features.columns = [f'sent_{col}' for col in sentiment_significant.columns] + [f'logret_{col}' for col in log_returns_significant.columns]
+    
+    # Normalize to [0,1] range
+    min_vals = features.min()
+    max_vals = features.max()
+    range_vals = max_vals - min_vals
+    
+    normalized_features = features.copy()
+    for col in features.columns:
+        if range_vals[col] != 0:
+            normalized_features[col] = (features[col] - min_vals[col]) / range_vals[col]
+        else:
+            normalized_features[col] = 0.5  # Neutral for constant features
+    
+    normalized_features = normalized_features.fillna(0)
+    
+    print(f"Conditional sentiment features shape: {normalized_features.shape}")
+    print(f"Feature structure: 0-{len(significant_assets)-1} = Sentiment (significant assets), {len(significant_assets)}-{2*len(significant_assets)-1} = Log returns (significant assets)")
+    
+    return normalized_features, significant_assets, correlations
+
+# Legacy function for backward compatibility
+def create_nlp_features(sentiment_data, monthly_returns):
+    """
+    Legacy function - use create_sentiment_features() instead
+    """
+    return create_sentiment_features(sentiment_data, monthly_returns, mode='sentiment_logret')
 
 
 
@@ -260,7 +366,7 @@ class HARLFPortfolioEnv(gym.Env):
     """
     
     def __init__(self, price_data, features, sentiment_features=None, 
-                 train_period=True, alpha1=1.0, alpha2=2.0, alpha3=0.5):
+                 train_period=True, alpha1=20.0, alpha2=0.2, alpha3=0.05):
         super(HARLFPortfolioEnv, self).__init__()
         
         self.price_data = price_data
@@ -400,30 +506,41 @@ class HARLFPortfolioEnv(gym.Env):
     
     def _calculate_reward(self, weights, portfolio_return, old_value):
         """
-        Calculate reward using HARLF formula:
+        Calculate reward using improved HARLF formula:
         Reward = α1 * ROI - α2 * MDD - α3 * σ
+        With better scaling and stability
         """
-        # ROI component
+        # ROI component (amplified to make positive returns more rewarding)
         roi = portfolio_return
         
-        # Maximum Drawdown component
-        if len(self.portfolio_history) >= 2:
+        # Maximum Drawdown component (only penalize significant drawdowns)
+        if len(self.portfolio_history) >= 3:
             portfolio_series = pd.Series(self.portfolio_history)
             peak = portfolio_series.expanding().max()
             drawdown = (portfolio_series - peak) / peak
             max_drawdown = abs(drawdown.min())
+            # Only penalize drawdowns > 1%
+            max_drawdown = max(0, max_drawdown - 0.01)
         else:
             max_drawdown = 0
         
-        # Volatility component (using recent portfolio returns)
-        if len(self.portfolio_history) >= 21:
-            recent_returns = pd.Series(self.portfolio_history[-21:]).pct_change().dropna()
-            volatility = recent_returns.std()
+        # Volatility component (only penalize excessive volatility)
+        if len(self.portfolio_history) >= 10:
+            recent_returns = pd.Series(self.portfolio_history[-10:]).pct_change().dropna()
+            if len(recent_returns) > 0:
+                volatility = recent_returns.std()
+                # Only penalize volatility > 5%
+                volatility = max(0, volatility - 0.05)
+            else:
+                volatility = 0
         else:
             volatility = 0
         
-        # Calculate final reward
+        # Calculate final reward with improved scaling
         reward = self.alpha1 * roi - self.alpha2 * max_drawdown - self.alpha3 * volatility
+        
+        # Add positive bias to encourage exploration and make rewards more positive
+        reward += 0.01
         
         return reward
     
@@ -470,8 +587,6 @@ def load_base_agents(model_dir: Path | str = "models") -> dict[str, object]:
     Looks at the zip files in `models/` and loads them with SB3.
     """
     model_dir = Path(model_dir)
-
-    # names were stored previously in base_agent_names.pkl, we can reconstruct them from filenames
     agent_paths = sorted(model_dir.glob("base_agent_*_*.zip"))
     agents: dict[str, object] = {}
 
