@@ -36,25 +36,28 @@ class MetaAgentEnv(gym.Env):
         self.alpha3 = self.alpha_vol
         self.exploration_bias = exploration_bias
         
-        # Regime indicators (bull/bear market signals)
-        self.regime_indicators = regime_indicators
-        
-        # Observation includes: tech + sentiment features + all agent weights + regime
-        obs_dim = features.shape[1] + sentiment_features.shape[1] + 3*self.n_assets
-        if regime_indicators is not None:
-            obs_dim += regime_indicators.shape[1]
-        
-        self.action_space = spaces.Box(low=0.0, high=1.0, shape=(self.n_assets,), dtype=np.float32)
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
-        
         # Find common dates across all data sources
         self.common_dates = (features.index
                              .intersection(sentiment_features.index)
                              .intersection(price_data.index))
         
+        # Align regime indicators with common dates
+        if regime_indicators is not None:
+            self.regime_indicators = regime_indicators.loc[self.common_dates]
+        else:
+            self.regime_indicators = None
+        
+        # Observation includes: tech + sentiment features + all agent weights + regime
+        obs_dim = features.shape[1] + sentiment_features.shape[1] + 3*self.n_assets
+        if self.regime_indicators is not None:
+            obs_dim += self.regime_indicators.shape[1]
+        
+        self.action_space = spaces.Box(low=0.0, high=1.0, shape=(self.n_assets,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
+        
         self.reset()
     
-    def reset(self, seed=None):
+    def reset(self, seed=None, options=None):
         if seed is not None:
             np.random.seed(seed)
         
@@ -183,26 +186,30 @@ class MetaAgentEnv(gym.Env):
         # Update sentiment agent
         sent_obs = self.sentiment_features.loc[current_date].values
         sent_obs = np.nan_to_num(sent_obs, nan=0.0).astype(np.float32)
-        sent_action, _ = self.sentiment_agent.predict(sent_obs, deterministic=True)
-        sent_action = np.clip(sent_action, 0, 1)
-        if sent_action.sum() > 1e-6:
-            self.sentiment_agent.weights = sent_action / sent_action.sum()
+        self.sentiment_agent.predict(sent_obs, deterministic=True)
         
         # Update technical agent
         tech_obs = self.features.loc[current_date].values
         tech_obs = np.nan_to_num(tech_obs, nan=0.0).astype(np.float32)
-        tech_action, _ = self.technical_agent.predict(tech_obs, deterministic=True)
-        tech_action = np.clip(tech_action, 0, 1)
-        if tech_action.sum() > 1e-6:
-            self.technical_agent.weights = tech_action / tech_action.sum()
+        self.technical_agent.predict(tech_obs, deterministic=True)
         
         # Update super agent
-        super_obs = np.concatenate([self.sentiment_agent.weights, 
-                                    self.technical_agent.weights]).astype(np.float32)
-        super_action, _ = self.super_agent.predict(super_obs, deterministic=True)
-        super_action = np.clip(super_action, 0, 1)
-        if super_action.sum() > 1e-6:
-            self.super_agent.weights = super_action / super_action.sum()
+        # Build super agent observation to match its expected space: sentiment weights + technical weights + regime
+        base_obs = np.concatenate([
+            self.sentiment_agent.weights,
+            self.technical_agent.weights
+        ])
+        if self.regime_indicators is not None:
+            if current_date in self.regime_indicators.index:
+                regime_obs = self.regime_indicators.loc[current_date].values
+                regime_obs = np.nan_to_num(regime_obs, nan=0.0).astype(np.float32)
+            else:
+                # Fallback to zeros if regime row is missing for the date
+                regime_obs = np.zeros(self.regime_indicators.shape[1], dtype=np.float32)
+            super_obs = np.concatenate([base_obs, regime_obs]).astype(np.float32)
+        else:
+            super_obs = base_obs.astype(np.float32)
+        self.super_agent.predict(super_obs, deterministic=True)
     
     def get_portfolio_metrics(self):
         portfolio_series = pd.Series(self.portfolio_history)
@@ -219,10 +226,13 @@ class MetaAgentEnv(gym.Env):
         max_drawdown = abs(drawdown.min())
         volatility = returns.std() * np.sqrt(12) if len(returns) > 0 else 0
         
+        # Add win_rate for consistency with other environments
+        win_rate = np.mean(np.array(self.returns_history) > 0) if self.returns_history else 0
         return {
             "total_return": total_return,
             "sharpe_ratio": sharpe_ratio,
             "max_drawdown": max_drawdown,
             "volatility": volatility,
-            "final_value": self.portfolio_value
+            "final_value": self.portfolio_value,
+            "win_rate": win_rate,
         }

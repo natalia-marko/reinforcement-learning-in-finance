@@ -7,8 +7,7 @@ import pandas as pd
 class SuperAgentEnv(gym.Env):
     """
     Super agent combines recommendations from sentiment and technical agents.
-    Action: Blending weights between the two base agents' recommendations.
-    Observation: Base agent weights + market regime indicators
+    Simplified: Super agent observes base agent weights and makes direct allocation decisions.
     """
     def __init__(self, price_data, sentiment_agent, technical_agent, regime_indicators=None,
                  initial_capital=100000, alpha_returns=1.0, alpha_mdd=0.5, alpha_vol=0.5, 
@@ -32,25 +31,27 @@ class SuperAgentEnv(gym.Env):
         self.alpha3 = self.alpha_vol
         self.exploration_bias = exploration_bias
         
-        # Regime indicators (bull/bear market signals)
-        self.regime_indicators = regime_indicators
+        # Use price_data dates as the authoritative timeline
+        # The base agents will be queried at each step regardless of their training period
+        self.common_dates = price_data.index
+        
+        # Align regime indicators with common dates
+        if regime_indicators is not None:
+            self.regime_indicators = regime_indicators.loc[self.common_dates]
+        else:
+            self.regime_indicators = None
         
         # Action: portfolio weights (blend of base agent recommendations)
         self.action_space = spaces.Box(low=0.0, high=1.0, shape=(self.n_assets,), dtype=np.float32)
         
-        # Observation: weights from both base agents + regime indicators
-        obs_dim = 2 * self.n_assets  # Base agent weights
-        if regime_indicators is not None:
-            obs_dim += regime_indicators.shape[1]  # Add regime features
+        # Observation space: Sentiment + Technical weights + optional regime indicators
+        obs_dim = 2 * self.n_assets  # Sentiment + Technical weights
+        if self.regime_indicators is not None:
+            obs_dim += self.regime_indicators.shape[1]
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
-        
-        # Use common dates from both agents
-        self.common_dates = sentiment_agent.env.common_dates.intersection(
-            technical_agent.env.common_dates
-        )
         self.reset()
     
-    def reset(self, seed=None):
+    def reset(self, seed=None, options=None):
         if seed is not None:
             np.random.seed(seed)
         
@@ -152,10 +153,7 @@ class SuperAgentEnv(gym.Env):
                 if hasattr(sent_env, 'sentiment_features') and next_date in sent_env.sentiment_features.index:
                     sent_obs = sent_env.sentiment_features.loc[next_date].values
                     sent_obs = np.nan_to_num(sent_obs, nan=0.0).astype(np.float32)
-                    sent_action, _ = self.sentiment_agent.predict(sent_obs, deterministic=True)
-                    sent_action = np.clip(sent_action, 0, 1)
-                    if sent_action.sum() > 1e-6:
-                        self.sentiment_agent.weights = sent_action / sent_action.sum()
+                    self.sentiment_agent.predict(sent_obs, deterministic=True)
             
             # Update technical agent
             if hasattr(self.technical_agent, 'env'):
@@ -163,10 +161,7 @@ class SuperAgentEnv(gym.Env):
                 if hasattr(tech_env, 'features') and next_date in tech_env.features.index:
                     tech_obs = tech_env.features.loc[next_date].values
                     tech_obs = np.nan_to_num(tech_obs, nan=0.0).astype(np.float32)
-                    tech_action, _ = self.technical_agent.predict(tech_obs, deterministic=True)
-                    tech_action = np.clip(tech_action, 0, 1)
-                    if tech_action.sum() > 1e-6:
-                        self.technical_agent.weights = tech_action / tech_action.sum()
+                    self.technical_agent.predict(tech_obs, deterministic=True)
         
         done = self.current_step >= len(self.common_dates) - 1
         
@@ -182,6 +177,7 @@ class SuperAgentEnv(gym.Env):
         return obs, reward, done, False, info
     
     def get_portfolio_metrics(self):
+        """Calculate portfolio performance metrics"""
         portfolio_series = pd.Series(self.portfolio_history)
         returns = portfolio_series.pct_change().dropna()
         total_return = (self.portfolio_value - self.initial_capital) / self.initial_capital
@@ -195,11 +191,14 @@ class SuperAgentEnv(gym.Env):
         drawdown = (portfolio_series - peak) / peak
         max_drawdown = abs(drawdown.min())
         volatility = returns.std() * np.sqrt(12) if len(returns) > 0 else 0
+        # FIXED: Added win_rate to metrics
+        win_rate = np.mean(np.array(self.returns_history) > 0) if self.returns_history else 0
         
         return {
             "total_return": total_return,
             "sharpe_ratio": sharpe_ratio,
             "max_drawdown": max_drawdown,
             "volatility": volatility,
-            "final_value": self.portfolio_value
+            "final_value": self.portfolio_value,
+            "win_rate": win_rate
         }

@@ -1,4 +1,4 @@
-# HARLF System Architecture with Regime Indicators
+# HARLF System Architecture
 
 ## Visual Overview
 
@@ -54,7 +54,7 @@
           │ ┌──────────────────────────────┐ │
           │ │ Sentiment weights:  10 dims  │ │
           │ │ Technical weights:  10 dims  │ │
-          │ │ Regime indicators:  10 dims  │ │◄─ Regime Added Here!
+          │ │ Regime indicators:  10 dims  │ │
           │ │ ─────────────────────────────│ │
           │ │ Total observation:  30 dims  │ │
           │ └──────────────────────────────┘ │

@@ -22,7 +22,7 @@ class EarlyStoppingCallback(BaseCallback):
         patience: Number of evaluations without improvement before stopping
         verbose: Verbosity level (0: silent, 1: print updates)
     """
-    def __init__(self, val_env, eval_freq=2000, patience=5, min_delta=0.0, 
+    def __init__(self, val_env, eval_freq=2000, patience=5, min_delta=0.01, 
                  save_path=None, verbose=1):
         super().__init__(verbose)
         self.val_env = val_env
@@ -88,22 +88,36 @@ class EarlyStoppingCallback(BaseCallback):
         plt.title(f'Validation Performance: {agent_name}')
         plt.legend()
         plt.grid(True, alpha=0.3)
-        plt.savefig(f'./models/{agent_name}_sharpe_curves.png')
+        plt.savefig(f'./plots/{agent_name}_sharpe_curves.png')
         plt.close()
-        print(f"Plot saved: ./models/{agent_name}_sharpe_curves.png")
+        print(f"Plot saved: ./plots/{agent_name}_sharpe_curves.png")
 
 
 class AgentWrapper:
-    """Wrapper to add weights attribute and algorithm info to agents"""
+    """
+    Wrapper to add weights attribute and algorithm info to agents.
+    Works for all agent types: 'sentiment', 'technical', 'super', 'meta'.
+    
+    The predict() method automatically:
+    - Clips actions to [0, 1]
+    - Normalizes to sum to 1
+    - Updates self.weights
+    
+    Callers should NOT manually normalize or clip after calling predict().
+    """
     def __init__(self, model, env, algorithm_name, agent_type):
         self.model = model
         self.env = env
         self.algorithm = algorithm_name  # 'PPO' or 'SAC'
-        self.agent_type = agent_type  # 'sentiment' or 'technical'
+        self.agent_type = agent_type  # 'sentiment', 'technical', 'super', or 'meta'
         n_assets = len(env.price_data.columns)
         self.weights = np.ones(n_assets) / n_assets
     
     def predict(self, obs, deterministic=True):
+        """
+        Get action from model and automatically update weights.
+        Returns normalized action and state.
+        """
         action, state = self.model.predict(obs, deterministic=deterministic)
         action = np.clip(action, 0, 1)
         total = action.sum()
@@ -111,8 +125,8 @@ class AgentWrapper:
             self.weights = action / total
         return action, state
     
-    def reset(self, seed=None):
-        return self.env.reset(seed=seed)
+    def reset(self, seed=None, options=None):
+        return self.env.reset(seed=seed, options=options)
     
     def save(self, path):
         self.model.save(path)
