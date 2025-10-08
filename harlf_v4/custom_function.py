@@ -19,11 +19,30 @@ def add_regime_indicator(prices, window=6):
 
 
 def split_data_chronologically(price_data, technical_features, sentiment_features,
-                               train_ratio=0.60, val_ratio=0.20, test_ratio=0.20):
+                               train_ratio=0.60, val_ratio=0.20):
+    """
+    Split data chronologically for machine learning training.
     
+    Args:
+        price_data: DataFrame of asset prices (rows=dates, cols=assets)
+        technical_features: DataFrame of technical indicators
+        sentiment_features: DataFrame of sentiment features
+        train_ratio: Proportion for training set (default 0.60)
+        val_ratio: Proportion for validation set (default 0.20)
+        
+    Returns:
+        dict: Contains 'train', 'val', 'test' tuples of (prices, technical, sentiment)
+        
+    Note: test_ratio is implicit (1 - train_ratio - val_ratio)
+    """
     print("\n" + "="*70)
     print("DATA SPLITTING")
     print("="*70)
+    
+    # Input validation
+    assert 0 < train_ratio < 1, "train_ratio must be between 0 and 1"
+    assert 0 < val_ratio < 1, "val_ratio must be between 0 and 1"
+    assert train_ratio + val_ratio < 1, "train_ratio + val_ratio must be < 1"
     
     # Verify all data has same length
     assert len(price_data) == len(technical_features) == len(sentiment_features), \
@@ -38,7 +57,7 @@ def split_data_chronologically(price_data, technical_features, sentiment_feature
     
     # Check minimum data requirements
     if n_total < 36:
-        print(f"\n⚠️  WARNING: Only {n_total} months of data!")
+        print(f"\nWARNING: Only {n_total} months of data!")
         print(f"   Recommended: 60+ months")
         print(f"   Consider using more data or weekly frequency")
     
@@ -56,14 +75,15 @@ def split_data_chronologically(price_data, technical_features, sentiment_feature
     test_sentiment = sentiment_features.iloc[n_train + n_val:]
     
     # Print split info
+    test_ratio = 1 - train_ratio - val_ratio
     print(f"\n{'='*70}")
     print("DATA SPLIT SUMMARY:")
     print(f"{'='*70}")
-    print(f"✓ Train: {len(train_prices):3d} months ({train_ratio:.0%}) | "
+    print(f"Train: {len(train_prices):3d} months ({train_ratio:.0%}) | "
           f"{train_prices.index[0].strftime('%Y-%m')} to {train_prices.index[-1].strftime('%Y-%m')}")
-    print(f"✓ Val:   {len(val_prices):3d} months ({val_ratio:.0%}) | "
+    print(f"Val:   {len(val_prices):3d} months ({val_ratio:.0%}) | "
           f"{val_prices.index[0].strftime('%Y-%m')} to {val_prices.index[-1].strftime('%Y-%m')}")
-    print(f"✓ Test:  {len(test_prices):3d} months ({test_ratio:.0%}) | "
+    print(f"Test:  {len(test_prices):3d} months ({test_ratio:.0%}) | "
           f"{test_prices.index[0].strftime('%Y-%m')} to {test_prices.index[-1].strftime('%Y-%m')}")
     print(f"{'='*70}")
     
@@ -71,7 +91,7 @@ def split_data_chronologically(price_data, technical_features, sentiment_feature
     assert train_prices.index[-1] < val_prices.index[0], "Train/Val overlap!"
     assert val_prices.index[-1] < test_prices.index[0], "Val/Test overlap!"
     
-    print("\n✓ No data leakage - splits are properly separated")
+    print("\nNo data leakage - splits are properly separated")
     
     return {
         'train': (train_prices, train_technical, train_sentiment),

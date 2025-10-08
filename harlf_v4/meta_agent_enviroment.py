@@ -5,51 +5,6 @@ import pandas as pd
 
 
 class MetaAgentEnv(gym.Env):
-    def __init__(self, price_data, features, sentiment_features, sentiment_agent, technical_agent, super_agent, **kwargs):
-        super().__init__()
-        self.price_data = price_data
-        self.features = features
-        self.sentiment_features = sentiment_features
-        self.sentiment_agent = sentiment_agent
-        self.technical_agent = technical_agent
-        self.super_agent = super_agent
-        self.n_assets = len(price_data.columns)
-        obs_dim = features.shape[1] + sentiment_features.shape[1] + 3*self.n_assets
-        self.action_space = spaces.Box(low=0.0, high=1.0, shape=(self.n_assets,), dtype=np.float32)
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(obs_dim,), dtype=np.float32)
-        self.current_step = 0
-        self.portfolio_value = 100000
-        self.weights = np.ones(self.n_assets) / self.n_assets
-    def reset(self, seed=None):
-        self.current_step = 0
-        self.portfolio_value = 100000
-        self.weights = np.ones(self.n_assets) / self.n_assets
-        self.sentiment_agent.reset(seed)
-        self.technical_agent.reset(seed)
-        self.super_agent.reset(seed)
-        return self._get_observation(), {}
-    def _get_observation(self):
-        current_date = self.features.index[self.current_step]
-        tech_obs = self.features.loc[current_date].values
-        sent_obs = self.sentiment_features.loc[current_date].values
-        sentiment_weights = self.sentiment_agent.weights
-        technical_weights = self.technical_agent.weights
-        super_weights = self.super_agent.weights
-        obs = np.concatenate([tech_obs, sent_obs, sentiment_weights, technical_weights, super_weights])
-        obs = np.nan_to_num(obs, nan=0.0)
-        return obs.astype(np.float32)
-    def step(self, action):
-        # Portfolio update logic here, meta agent makes the final decision
-        pass
-
-
-import gym
-from gym import spaces
-import numpy as np
-import pandas as pd
-
-
-class MetaAgentEnv(gym.Env):
     """
     Meta agent is the top-level coordinator that observes all agents
     and makes the final portfolio decision.
@@ -58,7 +13,9 @@ class MetaAgentEnv(gym.Env):
     def __init__(self, price_data, features, sentiment_features, 
                  sentiment_agent, technical_agent, super_agent, 
                  regime_indicators=None, initial_capital=100000, 
-                 alpha1=1.0, alpha2=0.5, alpha3=0.5, exploration_bias=0.001, **kwargs):
+                 alpha_returns=1.0, alpha_mdd=0.5, alpha_vol=0.5, exploration_bias=0.001,
+                 # Backward compatibility with old names
+                 alpha1=None, alpha2=None, alpha3=None, **kwargs):
         super().__init__()
         self.price_data = price_data
         self.features = features
@@ -69,10 +26,14 @@ class MetaAgentEnv(gym.Env):
         self.n_assets = len(price_data.columns)
         self.initial_capital = initial_capital
         
-        # Reward function parameters
-        self.alpha1 = alpha1
-        self.alpha2 = alpha2
-        self.alpha3 = alpha3
+        # Reward function parameters (support both old and new naming)
+        self.alpha_returns = alpha1 if alpha1 is not None else alpha_returns
+        self.alpha_mdd = alpha2 if alpha2 is not None else alpha_mdd
+        self.alpha_vol = alpha3 if alpha3 is not None else alpha_vol
+        # Keep old names for backward compatibility
+        self.alpha1 = self.alpha_returns
+        self.alpha2 = self.alpha_mdd
+        self.alpha3 = self.alpha_vol
         self.exploration_bias = exploration_bias
         
         # Regime indicators (bull/bear market signals)

@@ -11,8 +11,10 @@ class SuperAgentEnv(gym.Env):
     Observation: Base agent weights + market regime indicators
     """
     def __init__(self, price_data, sentiment_agent, technical_agent, regime_indicators=None,
-                 initial_capital=100000, alpha1=1.0, alpha2=0.5, alpha3=0.5, 
-                 exploration_bias=0.01, **kwargs):
+                 initial_capital=100000, alpha_returns=1.0, alpha_mdd=0.5, alpha_vol=0.5, 
+                 exploration_bias=0.01, 
+                 # Backward compatibility with old names
+                 alpha1=None, alpha2=None, alpha3=None, **kwargs):
         super().__init__()
         self.price_data = price_data
         self.sentiment_agent = sentiment_agent
@@ -20,10 +22,14 @@ class SuperAgentEnv(gym.Env):
         self.n_assets = len(price_data.columns)
         self.initial_capital = initial_capital
         
-        # Reward function parameters
-        self.alpha1 = alpha1
-        self.alpha2 = alpha2
-        self.alpha3 = alpha3
+        # Reward function parameters (support both old and new naming)
+        self.alpha_returns = alpha1 if alpha1 is not None else alpha_returns
+        self.alpha_mdd = alpha2 if alpha2 is not None else alpha_mdd
+        self.alpha_vol = alpha3 if alpha3 is not None else alpha_vol
+        # Keep old names for backward compatibility
+        self.alpha1 = self.alpha_returns
+        self.alpha2 = self.alpha_mdd
+        self.alpha3 = self.alpha_vol
         self.exploration_bias = exploration_bias
         
         # Regime indicators (bull/bear market signals)
@@ -136,14 +142,31 @@ class SuperAgentEnv(gym.Env):
         self.current_step += 1
         
         # Update base agents to keep them in sync
-        # Note: They take their own actions, but we use super agent's decision
-        sentiment_obs = self.sentiment_agent.env.observations[self.current_step]
-        sentiment_action, _ = self.sentiment_agent.predict(sentiment_obs, deterministic=True)
-        self.sentiment_agent.env.weights = sentiment_action / sentiment_action.sum()
-        
-        technical_obs = self.technical_agent.env.observations[self.current_step]
-        technical_action, _ = self.technical_agent.predict(technical_obs, deterministic=True)
-        self.technical_agent.env.weights = technical_action / technical_action.sum()
+        # Note: They provide recommendations, but super agent makes final decision
+        if self.current_step < len(self.common_dates):
+            next_date = self.common_dates[self.current_step]
+            
+            # Update sentiment agent
+            if hasattr(self.sentiment_agent, 'env'):
+                sent_env = self.sentiment_agent.env
+                if hasattr(sent_env, 'sentiment_features') and next_date in sent_env.sentiment_features.index:
+                    sent_obs = sent_env.sentiment_features.loc[next_date].values
+                    sent_obs = np.nan_to_num(sent_obs, nan=0.0).astype(np.float32)
+                    sent_action, _ = self.sentiment_agent.predict(sent_obs, deterministic=True)
+                    sent_action = np.clip(sent_action, 0, 1)
+                    if sent_action.sum() > 1e-6:
+                        self.sentiment_agent.weights = sent_action / sent_action.sum()
+            
+            # Update technical agent
+            if hasattr(self.technical_agent, 'env'):
+                tech_env = self.technical_agent.env
+                if hasattr(tech_env, 'features') and next_date in tech_env.features.index:
+                    tech_obs = tech_env.features.loc[next_date].values
+                    tech_obs = np.nan_to_num(tech_obs, nan=0.0).astype(np.float32)
+                    tech_action, _ = self.technical_agent.predict(tech_obs, deterministic=True)
+                    tech_action = np.clip(tech_action, 0, 1)
+                    if tech_action.sum() > 1e-6:
+                        self.technical_agent.weights = tech_action / tech_action.sum()
         
         done = self.current_step >= len(self.common_dates) - 1
         

@@ -22,7 +22,7 @@ class TechnicalEnv(gym.Env):
     """
     
     def __init__(self, price_data, features, initial_capital=100000, 
-                 vol_window=3, **kwargs):
+                 vol_window=3, transaction_cost=0.001, verbose=0, **kwargs):
         super().__init__()
         
         # Store data
@@ -31,6 +31,8 @@ class TechnicalEnv(gym.Env):
         self.n_assets = len(price_data.columns)
         self.initial_capital = initial_capital
         self.vol_window = vol_window
+        self.transaction_cost = transaction_cost
+        self.verbose = verbose
         
         # For risk-adjusted returns calculation
         self.returns_history = []
@@ -59,11 +61,12 @@ class TechnicalEnv(gym.Env):
                            f"Price data: {len(price_data)} dates, "
                            f"Features: {len(features)} dates")
         
-        print(f"Technical Environment initialized:")
-        print(f"  - Assets: {self.n_assets}")
-        print(f"  - Technical features: {features.shape[1]}")
-        print(f"  - Time steps: {len(self.common_dates)}")
-        print(f"  - Date range: {self.common_dates[0]} to {self.common_dates[-1]}")
+        if self.verbose > 0:
+            print(f"Technical Environment initialized:")
+            print(f"  - Assets: {self.n_assets}")
+            print(f"  - Technical features: {features.shape[1]}")
+            print(f"  - Time steps: {len(self.common_dates)}")
+            print(f"  - Date range: {self.common_dates[0]} to {self.common_dates[-1]}")
         
         self.reset()
     
@@ -136,6 +139,11 @@ class TechnicalEnv(gym.Env):
         # Portfolio arithmetic return (weighted sum)
         portfolio_return = np.sum(weights * arithmetic_returns)
         
+        # Apply transaction costs
+        prev_weights = self.weights.copy()
+        transaction_cost = self.transaction_cost * np.sum(np.abs(weights - prev_weights))
+        portfolio_return -= transaction_cost
+        
         # Convert portfolio return to log return
         portfolio_log_return = np.log(1 + portfolio_return)
         
@@ -147,17 +155,21 @@ class TechnicalEnv(gym.Env):
         self.portfolio_value *= (1 + portfolio_return)
         self.portfolio_history.append(self.portfolio_value)
         
-        # Calculate risk-adjusted reward
+        # Calculate risk-adjusted reward (Sharpe-like ratio)
         recent_returns = self.returns_history[-self.vol_window:]
-        if len(recent_returns) > 1:
+        if len(recent_returns) >= 2:
             mean_return = np.mean(recent_returns)
-            volatility = np.std(recent_returns)
+            # Use ddof=1 for unbiased variance estimator (Bessel's correction)
+            volatility = np.std(recent_returns, ddof=1)
             if volatility > 1e-6:
                 sharpe_like = mean_return / volatility
             else:
-                sharpe_like = mean_return
-            reward = sharpe_like
+                # If zero volatility, reward is just mean return scaled up
+                sharpe_like = mean_return * 10
+            # Clip extreme values to prevent training instability
+            reward = np.clip(sharpe_like, -10, 10)
         else:
+            # Fallback to raw return when insufficient history
             reward = portfolio_return
         
         # Store weights and increment step

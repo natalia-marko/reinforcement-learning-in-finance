@@ -75,7 +75,7 @@
           │ │ Sentiment weights:    10     │ │
           │ │ Technical weights:    10     │ │
           │ │ Super weights:        10     │ │
-          │ │ Regime indicators:    10     │ │◄─ Regime Added Here!
+          │ │ Regime indicators:    10     │ │
           │ │ ─────────────────────────────│ │
           │ │ Total observation:   203     │ │
           │ └──────────────────────────────┘ │
@@ -137,7 +137,7 @@ Output: 10 portfolio weights
 Input: 30 dimensions
 ├─ Sentiment weights:    [w1, w2, ..., w10]  (10 dims)
 ├─ Technical weights:    [w1, w2, ..., w10]  (10 dims)
-└─ Regime indicators:    [r1, r2, ..., r10]  (10 dims) ← NEW!
+└─ Regime indicators:    [r1, r2, ..., r10]  (10 dims) 
 
 Where regime ri ∈ {0, 1}:
 - 1 = Bull market (price > SMA)
@@ -154,7 +154,7 @@ Input: 203 dimensions
 ├─ Sentiment weights:     10 dims
 ├─ Technical weights:     10 dims
 ├─ Super weights:         10 dims
-└─ Regime indicators:     10 dims ← NEW!
+└─ Regime indicators:     10 dims
 
 Output: 10 portfolio weights (final portfolio)
 ```

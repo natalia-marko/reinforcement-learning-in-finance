@@ -8,61 +8,89 @@ from sentiment_enviroment import SentimentEnv
 from technical_enviroment import TechnicalEnv
 from custom_function import split_data_chronologically
 from stable_baselines3.common.callbacks import BaseCallback
-import matplotlib.pyplot as plt
+
 
 
 
 class EarlyStoppingCallback(BaseCallback):
-    def __init__(self, val_env, eval_freq=5000, patience=5, verbose=1):
+    """
+    Early stopping callback that monitors validation performance.
+    
+    Args:
+        val_env: Validation environment for evaluation
+        eval_freq: Frequency (in steps) to evaluate on validation set
+        patience: Number of evaluations without improvement before stopping
+        verbose: Verbosity level (0: silent, 1: print updates)
+    """
+    def __init__(self, val_env, eval_freq=2000, patience=5, min_delta=0.0, 
+                 save_path=None, verbose=1):
         super().__init__(verbose)
         self.val_env = val_env
         self.eval_freq = eval_freq
         self.patience = patience
+        self.min_delta = min_delta
+        self.save_path = save_path
         self.best_sharpe = -np.inf
         self.wait = 0
-        self.train_sharpes = []  # For plotting
         self.val_sharpes = []
+        self.eval_steps = []
+        self.stopped_step = None
+        self.best_model_path = None
 
     def _on_step(self) -> bool:
         if self.n_calls % self.eval_freq != 0:
             return True
         
-        # Evaluate on val
+        # Evaluate on validation set
         metrics = evaluate_agent(self.model, self.val_env, phase="Validation (Callback)")
         val_sharpe = metrics['sharpe_ratio']
         self.val_sharpes.append(val_sharpe)
-        
-        # Approximate train Sharpe (from recent rewards; rough estimate)
-        train_sharpe = np.mean(self.locals['rewards']) / (np.std(self.locals['rewards']) + 1e-8) if len(self.locals['rewards']) > 0 else 0
-        self.train_sharpes.append(train_sharpe)
+        self.eval_steps.append(self.n_calls)
         
         if self.verbose > 0:
             print(f"Step {self.n_calls}: Val Sharpe = {val_sharpe:.3f}")
-        
-        if val_sharpe > self.best_sharpe:
+
+        # Check if this is a meaningful improvement
+        if val_sharpe > self.best_sharpe + self.min_delta:
             self.best_sharpe = val_sharpe
             self.wait = 0
+            
+            # Save best model
+            if self.save_path:
+                self.best_model_path = f"{self.save_path}_best"
+                self.model.save(self.best_model_path)
+                if self.verbose > 0:
+                    print(f"  New best! Saved model (Sharpe: {val_sharpe:.3f})")
         else:
             self.wait += 1
+            if self.verbose > 0:
+                print(f"  No improvement (patience: {self.wait}/{self.patience})")
+            
             if self.wait >= self.patience:
                 if self.verbose > 0:
-                    print(f"Early stopping: No val Sharpe improvement for {self.patience} evals.")
+                    print(f"Early stopping triggered at step {self.n_calls}")
+                    print(f"  Best Val Sharpe: {self.best_sharpe:.3f}")
+                self.stopped_step = self.n_calls
                 return False  # Stop training
+        
         return True
 
     def plot_curves(self, agent_name):
+        """Plot validation Sharpe ratio over training steps"""
+        if len(self.val_sharpes) == 0:
+            print(f"No validation data to plot for {agent_name}")
+            return
+            
         plt.figure(figsize=(10, 5))
-        steps = np.arange(len(self.train_sharpes)) * self.eval_freq
-        plt.plot(steps, self.train_sharpes, label='Train Sharpe (approx)')
-        plt.plot(steps, self.val_sharpes, label='Val Sharpe')
+        plt.plot(self.eval_steps, self.val_sharpes, label='Validation Sharpe', marker='o')
         plt.xlabel('Training Steps')
         plt.ylabel('Sharpe Ratio')
-        plt.title(f'Sharpe Curves for {agent_name}')
+        plt.title(f'Validation Performance: {agent_name}')
         plt.legend()
-        plt.grid(True)
-        #plt.savefig(f'./models/{agent_name}_sharpe_curves.png')
+        plt.grid(True, alpha=0.3)
+        plt.savefig(f'./models/{agent_name}_sharpe_curves.png')
         plt.close()
-        print(f"✓ Plot saved: ./models/{agent_name}_sharpe_curves.png")
+        print(f"Plot saved: ./models/{agent_name}_sharpe_curves.png")
 
 
 class AgentWrapper:
@@ -95,39 +123,42 @@ class AgentWrapper:
 
 
 def train_agent(env, val_env, agent_type, algorithm, timesteps=100000, 
-                ppo_params=None, sac_params=None): 
-    """Train a single agent with configurable hyperparameters"""
+                ppo_params=None, sac_params=None, early_stopping_params=None,
+                save_path='./models'): 
+    """Train a single agent with configurable hyperparameters and early stopping"""
     
     print(f"\nTraining {agent_type} with {algorithm}...")
     
     if algorithm == 'PPO':
-        default_ppo = {
-            'learning_rate': 3e-4,
-            'n_steps': 2048,
-            'batch_size': 64,
-            'n_epochs': 10,
-            'ent_coef': 0.01,
-            'verbose': 1
-        }
-        params = {**default_ppo, **(ppo_params or {})}
-        model = PPO("MlpPolicy", env, **params)
+        model = PPO("MlpPolicy", env, **(ppo_params or {}))
     else:  # SAC
-        default_sac = {
-            'learning_rate': 3e-4,
-            'buffer_size': 20000,
-            'learning_starts': 100,
-            'batch_size': 128,
-            'ent_coef': 'auto',
-            'verbose': 1
-        }
-        params = {**default_sac, **(sac_params or {})}
-        model = SAC("MlpPolicy", env, **params)
+        model = SAC("MlpPolicy", env, **(sac_params or {}))
 
-    callback = EarlyStoppingCallback(val_env, eval_freq=5000, patience=5)
+    # Configure early stopping with config parameters
+    es_params = early_stopping_params or {}
+    model_save_path = f"{save_path}/{agent_type}_{algorithm}"
+    
+    callback = EarlyStoppingCallback(
+        val_env, 
+        eval_freq=es_params.get('eval_freq', 1000),
+        patience=es_params.get('patience', 1),
+        min_delta=es_params.get('min_delta', 0.01),
+        save_path=model_save_path,
+        verbose=1
+    )
+    
     model.learn(total_timesteps=timesteps, callback=callback)
     callback.plot_curves(f"{agent_type}_{algorithm}")
     
-    return model
+    # Load best model if early stopping saved one
+    if callback.best_model_path:
+        print(f"Loading best model from: {callback.best_model_path}")
+        if algorithm == 'PPO':
+            model = PPO.load(callback.best_model_path, env=env)
+        else:
+            model = SAC.load(callback.best_model_path, env=env)
+    
+    return model, callback
 
 
 def evaluate_agent(model, env, phase="Test"):
@@ -155,7 +186,8 @@ def train_and_evaluate_with_split(price_data, technical_features, sentiment_feat
                                   train_ratio=0.60, val_ratio=0.20,
                                   timesteps=100000, algorithm='both',
                                   sentiment_env_params=None, technical_env_params=None,
-                                  ppo_params=None, sac_params=None):
+                                  ppo_params=None, sac_params=None,
+                                  early_stopping_params=None, save_path='./models'):
     """
     Complete workflow with proper train/val/test split.
     
@@ -182,6 +214,7 @@ def train_and_evaluate_with_split(price_data, technical_features, sentiment_feat
     test_prices, test_technical, test_sentiment = splits['test']
     
     results = {}
+    training_histories = {}
     
     # Algorithms to train
     algorithms = ['PPO', 'SAC'] if algorithm == 'both' else [algorithm.upper()]
@@ -199,8 +232,13 @@ def train_and_evaluate_with_split(price_data, technical_features, sentiment_feat
         sent_val_env = SentimentEnv(val_prices, val_sentiment, **sentiment_env_params)
         
         # Train with custom RL parameters
-        sent_model = train_agent(sent_train_env, sent_val_env, "Sentiment", algo, 
-                                timesteps, ppo_params, sac_params)
+        sent_model, sent_callback = train_agent(
+            sent_train_env, sent_val_env, "Sentiment", algo, 
+            timesteps, ppo_params, sac_params, early_stopping_params, save_path
+        )
+        
+        # Store callback for validation history
+        training_histories[f'sentiment_{algo.lower()}'] = sent_callback
         
         # Evaluate on all sets
         train_metrics = evaluate_agent(sent_model, sent_train_env, "Training")
@@ -232,8 +270,13 @@ def train_and_evaluate_with_split(price_data, technical_features, sentiment_feat
         tech_val_env = TechnicalEnv(val_prices, val_technical, **technical_env_params)
         
         # Train with custom RL parameters
-        tech_model = train_agent(tech_train_env, tech_val_env, "Technical", algo, 
-                                timesteps, ppo_params, sac_params)
+        tech_model, tech_callback = train_agent(
+            tech_train_env, tech_val_env, "Technical", algo, 
+            timesteps, ppo_params, sac_params, early_stopping_params, save_path
+        )
+        
+        # Store callback for validation history
+        training_histories[f'technical_{algo.lower()}'] = tech_callback
         
         # Evaluate on all sets
         train_metrics = evaluate_agent(tech_model, tech_train_env, "Training")
@@ -284,15 +327,15 @@ def train_and_evaluate_with_split(price_data, technical_features, sentiment_feat
         agent_name = name.replace('_', ' ').title()
         
         if degradation < 20:
-            status = "✓ Good generalization"
+            status = "Good generalization"
         elif degradation < 40:
-            status = "⚠️  Moderate overfitting"
+            status = "Moderate overfitting"
         else:
-            status = "✗ Severe overfitting"
+            status = "Severe overfitting"
         
         print(f"{agent_name:20s}: {degradation:>5.1f}% degradation - {status}")
     
-    return results, summary_df
+    return results, summary_df, training_histories
 
 
 def plot_train_val_test_comparison(results):
@@ -308,9 +351,29 @@ def plot_train_val_test_comparison(results):
     val_sharpes = [results[a]['val_metrics']['sharpe_ratio'] for a in agents]
     test_sharpes = [results[a]['test_metrics']['sharpe_ratio'] for a in agents]
     
-    train_returns = [results[a]['train_metrics']['total_return']*100 for a in agents]
-    val_returns = [results[a]['val_metrics']['total_return']*100 for a in agents]
-    test_returns = [results[a]['test_metrics']['total_return']*100 for a in agents]
+    # Calculate annualized returns (normalized for different time periods)
+    train_annualized = []
+    val_annualized = []
+    test_annualized = []
+    for agent in agents:
+        # Get total return and number of periods
+        train_total = results[agent]['train_metrics']['total_return']
+        val_total = results[agent]['val_metrics']['total_return']
+        test_total = results[agent]['test_metrics']['total_return']
+        
+        # Get number of months from environment
+        train_months = len(results[agent]['train_env'].portfolio_history) - 1
+        val_months = len(results[agent]['val_env'].portfolio_history) - 1
+        test_months = len(results[agent]['test_env'].portfolio_history) - 1
+        
+        # Annualize: (1 + total_return)^(12/n_months) - 1
+        train_ann = (((1 + train_total) ** (12 / train_months)) - 1) * 100 if train_months > 0 else 0
+        val_ann = (((1 + val_total) ** (12 / val_months)) - 1) * 100 if val_months > 0 else 0
+        test_ann = (((1 + test_total) ** (12 / test_months)) - 1) * 100 if test_months > 0 else 0
+        
+        train_annualized.append(train_ann)
+        val_annualized.append(val_ann)
+        test_annualized.append(test_ann)
     
     # Clean names
     agent_names = [a.replace('_', '\n').title() for a in agents]
@@ -330,16 +393,21 @@ def plot_train_val_test_comparison(results):
     axes[0, 0].grid(True, alpha=0.3, axis='y')
     axes[0, 0].axhline(y=1.0, color='green', linestyle='--', alpha=0.5)
     
-    # Total Return comparison
-    axes[0, 1].bar(x - width, train_returns, width, label='Train', alpha=0.8)
-    axes[0, 1].bar(x, val_returns, width, label='Validation', alpha=0.8)
-    axes[0, 1].bar(x + width, test_returns, width, label='Test', alpha=0.8)
-    axes[0, 1].set_ylabel('Total Return (%)')
-    axes[0, 1].set_title('Total Return: Train vs Val vs Test')
+    # Annualized Return comparison (normalized for fair comparison across all periods)
+    width_3 = 0.25
+    axes[0, 1].bar(x - width_3, train_annualized, width_3, label='Train', alpha=0.8, color='C0')
+    axes[0, 1].bar(x, val_annualized, width_3, label='Validation', alpha=0.8, color='C1')
+    axes[0, 1].bar(x + width_3, test_annualized, width_3, label='Test', alpha=0.8, color='C2')
+    axes[0, 1].set_ylabel('Annualized Return (%)')
+    axes[0, 1].set_title('Annualized Return: Train vs Val vs Test')
     axes[0, 1].set_xticks(x)
     axes[0, 1].set_xticklabels(agent_names, fontsize=9)
     axes[0, 1].legend()
     axes[0, 1].grid(True, alpha=0.3, axis='y')
+    axes[0, 1].axhline(y=0, color='black', linestyle='-', linewidth=0.5, alpha=0.3)
+    axes[0, 1].text(0.02, 0.98, 'Normalized to annual returns for fair comparison', 
+                    transform=axes[0, 1].transAxes, fontsize=8, 
+                    verticalalignment='top', style='italic', alpha=0.7)
     
     # Performance degradation (train - test)
     degradation = [(t - s) / t * 100 if t > 0 else 0 
