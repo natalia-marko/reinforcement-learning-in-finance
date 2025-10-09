@@ -10,7 +10,8 @@ class SuperAgentEnv(gym.Env):
     Simplified: Super agent observes base agent weights and makes direct allocation decisions.
     """
     def __init__(self, price_data, sentiment_agent, technical_agent, regime_indicators=None,
-                 initial_capital=100000, alpha_returns=1.0, alpha_mdd=0.5, alpha_vol=0.5, 
+                 initial_capital=100000, transaction_cost=0.01,
+                 alpha_returns=1.0, alpha_mdd=0.5, alpha_vol=0.5, 
                  exploration_bias=0.01, 
                  # Backward compatibility with old names
                  alpha1=None, alpha2=None, alpha3=None, **kwargs):
@@ -20,6 +21,7 @@ class SuperAgentEnv(gym.Env):
         self.technical_agent = technical_agent
         self.n_assets = len(price_data.columns)
         self.initial_capital = initial_capital
+        self.transaction_cost = transaction_cost
         
         # Reward function parameters (support both old and new naming)
         self.alpha_returns = alpha1 if alpha1 is not None else alpha_returns
@@ -106,6 +108,12 @@ class SuperAgentEnv(gym.Env):
         # Calculate portfolio return correctly
         arithmetic_returns = np.exp(log_returns) - 1
         portfolio_return = np.sum(weights * arithmetic_returns)
+        
+        # Apply transaction costs
+        prev_weights = self.weights.copy()
+        transaction_cost_penalty = self.transaction_cost * np.sum(np.abs(weights - prev_weights))
+        portfolio_return -= transaction_cost_penalty
+        
         portfolio_log_return = np.log(1 + portfolio_return)
         
         # Store for reward calculation
@@ -141,40 +149,62 @@ class SuperAgentEnv(gym.Env):
         # Store weights
         self.weights = weights
         self.current_step += 1
-        
-        # Update base agents to keep them in sync
-        # Note: They provide recommendations, but super agent makes final decision
-        if self.current_step < len(self.common_dates):
-            next_date = self.common_dates[self.current_step]
-            
-            # Update sentiment agent
-            if hasattr(self.sentiment_agent, 'env'):
-                sent_env = self.sentiment_agent.env
-                if hasattr(sent_env, 'sentiment_features') and next_date in sent_env.sentiment_features.index:
-                    sent_obs = sent_env.sentiment_features.loc[next_date].values
-                    sent_obs = np.nan_to_num(sent_obs, nan=0.0).astype(np.float32)
-                    self.sentiment_agent.predict(sent_obs, deterministic=True)
-            
-            # Update technical agent
-            if hasattr(self.technical_agent, 'env'):
-                tech_env = self.technical_agent.env
-                if hasattr(tech_env, 'features') and next_date in tech_env.features.index:
-                    tech_obs = tech_env.features.loc[next_date].values
-                    tech_obs = np.nan_to_num(tech_obs, nan=0.0).astype(np.float32)
-                    self.technical_agent.predict(tech_obs, deterministic=True)
-        
         done = self.current_step >= len(self.common_dates) - 1
+        
+        # Update base agents for NEXT step (proper temporal alignment)
+        # This maintains agent state synchronized with environment progression
+        # Key: We update agents AFTER transition to prepare for next observation
+        if not done:
+            self._update_base_agents()
+        
+        
         
         info = {
             "portfolio_value": self.portfolio_value,
             "portfolio_return": portfolio_return,
             "weights": weights,
             "sentiment_weights": self.sentiment_agent.weights,
-            "technical_weights": self.technical_agent.weights
+            "technical_weights": self.technical_agent.weights,
+            "transaction_cost": transaction_cost_penalty
         }
         
         obs = self._get_observation()
         return obs, reward, done, False, info
+    
+    def _update_base_agents(self):
+        """
+        Update base agents with current step observations.
+        
+        This is called AFTER each step transition to keep base agents
+        synchronized with the environment state. Base agents provide
+        recommendations based on their current observations, which the
+        super agent then uses to make portfolio decisions.
+        
+        Temporal alignment:
+        - After step t→t+1 transition
+        - Update agents with features at time t+1
+        - These updated weights will be used in next observation
+        """
+        if self.current_step >= len(self.common_dates):
+            return
+            
+        current_date = self.common_dates[self.current_step]
+        
+        # Update sentiment agent with current sentiment features
+        if hasattr(self.sentiment_agent, 'env'):
+            sent_env = self.sentiment_agent.env
+            if hasattr(sent_env, 'sentiment_features') and current_date in sent_env.sentiment_features.index:
+                sent_obs = sent_env.sentiment_features.loc[current_date].values
+                sent_obs = np.nan_to_num(sent_obs, nan=0.0).astype(np.float32)
+                self.sentiment_agent.predict(sent_obs, deterministic=True)
+        
+        # Update technical agent with current technical features
+        if hasattr(self.technical_agent, 'env'):
+            tech_env = self.technical_agent.env
+            if hasattr(tech_env, 'features') and current_date in tech_env.features.index:
+                tech_obs = tech_env.features.loc[current_date].values
+                tech_obs = np.nan_to_num(tech_obs, nan=0.0).astype(np.float32)
+                self.technical_agent.predict(tech_obs, deterministic=True)
     
     def get_portfolio_metrics(self):
         """Calculate portfolio performance metrics"""

@@ -1,10 +1,10 @@
-import gym
-from gym import spaces
+import gymnasium
+from gymnasium import spaces
 import numpy as np
 import pandas as pd
 
 
-class MetaAgentEnv(gym.Env):
+class MetaAgentEnv(gymnasium.Env):
     """
     Meta agent is the top-level coordinator that observes all agents
     and makes the final portfolio decision.
@@ -12,8 +12,9 @@ class MetaAgentEnv(gym.Env):
     """
     def __init__(self, price_data, features, sentiment_features, 
                  sentiment_agent, technical_agent, super_agent, 
-                 regime_indicators=None, initial_capital=100000, 
-                 alpha_returns=1.0, alpha_mdd=0.5, alpha_vol=0.5, exploration_bias=0.001,
+                 regime_indicators=None, initial_capital=100000,
+                 transaction_cost=0.001,
+                 alpha_returns=1.0, alpha_mdd=0.5, alpha_vol=0.5, exploration_bias=0.01,
                  # Backward compatibility with old names
                  alpha1=None, alpha2=None, alpha3=None, **kwargs):
         super().__init__()
@@ -25,6 +26,7 @@ class MetaAgentEnv(gym.Env):
         self.super_agent = super_agent
         self.n_assets = len(price_data.columns)
         self.initial_capital = initial_capital
+        self.transaction_cost = transaction_cost
         
         # Reward function parameters (support both old and new naming)
         self.alpha_returns = alpha1 if alpha1 is not None else alpha_returns
@@ -122,6 +124,12 @@ class MetaAgentEnv(gym.Env):
         # Calculate portfolio return correctly
         arithmetic_returns = np.exp(log_returns) - 1
         portfolio_return = np.sum(weights * arithmetic_returns)
+        
+        # Apply transaction costs
+        prev_weights = self.weights.copy()
+        transaction_cost_penalty = self.transaction_cost * np.sum(np.abs(weights - prev_weights))
+        portfolio_return -= transaction_cost_penalty
+        
         portfolio_log_return = np.log(1 + portfolio_return)
         
         # Store for reward calculation
@@ -157,12 +165,14 @@ class MetaAgentEnv(gym.Env):
         # Store weights
         self.weights = weights
         self.current_step += 1
-        
-        # Update all sub-agents to keep them in sync
-        # Each agent makes its own recommendation based on its observations
-        self._update_sub_agents()
-        
         done = self.current_step >= len(self.common_dates) - 1
+        
+        # Update all sub-agents for NEXT step (proper temporal alignment)
+        # This maintains all agents synchronized with environment progression
+        # With aligned reward functions, this creates a coherent hierarchy
+        if not done:
+            self._update_sub_agents()
+        
         
         info = {
             "portfolio_value": self.portfolio_value,
@@ -170,14 +180,27 @@ class MetaAgentEnv(gym.Env):
             "weights": weights,
             "sentiment_weights": self.sentiment_agent.weights,
             "technical_weights": self.technical_agent.weights,
-            "super_weights": self.super_agent.weights
+            "super_weights": self.super_agent.weights,
+            "transaction_cost": transaction_cost_penalty
         }
         
         obs = self._get_observation()
         return obs, reward, done, False, info
     
     def _update_sub_agents(self):
-        """Update all sub-agents with their respective observations"""
+        """
+        Update all sub-agents with their respective observations.
+        
+        With aligned reward functions across the hierarchy, this creates
+        a coherent multi-level system where each agent optimizes the same
+        core objective (returns - mdd - volatility) but at different levels.
+        
+        Temporal alignment:
+        - Called AFTER step t→t+1 transition
+        - Updates agents with features at time t+1
+        - Updated weights used in next observation at t+1
+        - No lookahead bias: using current features, not future
+        """
         if self.current_step >= len(self.common_dates):
             return
             

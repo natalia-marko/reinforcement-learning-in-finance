@@ -116,14 +116,23 @@ class AgentWrapper:
     def predict(self, obs, deterministic=True):
         """
         Get action from model and automatically update weights.
-        Returns normalized action and state.
+        Returns normalized weights and state (not raw action).
+        
+        IMPORTANT: Returns normalized weights that sum to 1, not raw action.
+        This ensures consistency across the hierarchy.
         """
         action, state = self.model.predict(obs, deterministic=deterministic)
         action = np.clip(action, 0, 1)
         total = action.sum()
         if total > 1e-6:
-            self.weights = action / total
-        return action, state
+            normalized_weights = action / total
+        else:
+            # Fallback to equal weights if action sums to zero
+            normalized_weights = np.ones(len(action)) / len(action)
+        
+        self.weights = normalized_weights
+        # Return normalized weights, not raw action
+        return normalized_weights, state
     
     def reset(self, seed=None, options=None):
         return self.env.reset(seed=seed, options=options)

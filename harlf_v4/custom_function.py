@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 
 def add_regime_indicator(prices, window=6):
@@ -98,3 +99,105 @@ def split_data_chronologically(price_data, technical_features, sentiment_feature
         'val': (val_prices, val_technical, val_sentiment),
         'test': (test_prices, test_technical, test_sentiment)
     }
+
+
+def create_performance_comparison_table(super_metrics, meta_metrics, test_periods):
+    """
+    Create comprehensive performance comparison table for hierarchical agents.
+    
+    Args:
+        super_metrics: Dictionary of metrics from super agent test evaluation
+        meta_metrics: Dictionary of metrics from meta agent test evaluation
+        test_periods: Number of test periods (months)
+        
+    Returns:
+        DataFrame with formatted comparison including improvement percentages
+    """
+    comparison_data = {
+        'Metric': [
+            'Sharpe Ratio', 
+            'Total Return (%)', 
+            'Annualized Return (%)', 
+            'Max Drawdown (%)', 
+            'Volatility (%)', 
+            'Win Rate (%)', 
+            'Final Value ($)'
+        ],
+        'Super Agent': [
+            f"{super_metrics['sharpe_ratio']:.3f}",
+            f"{super_metrics['total_return']*100:.2f}",
+            f"{(np.power(1 + super_metrics['total_return'], 12/test_periods) - 1)*100:.2f}",
+            f"{super_metrics['max_drawdown']*100:.2f}",
+            f"{super_metrics['volatility']*100:.2f}",
+            f"{super_metrics['win_rate']*100:.2f}",
+            f"{super_metrics['final_value']:,.2f}"
+        ],
+        'Meta Agent': [
+            f"{meta_metrics['sharpe_ratio']:.3f}",
+            f"{meta_metrics['total_return']*100:.2f}",
+            f"{(np.power(1 + meta_metrics['total_return'], 12/test_periods) - 1)*100:.2f}",
+            f"{meta_metrics['max_drawdown']*100:.2f}",
+            f"{meta_metrics['volatility']*100:.2f}",
+            f"{meta_metrics['win_rate']*100:.2f}",
+            f"{meta_metrics['final_value']:,.2f}"
+        ]
+    }
+    
+    comparison_df = pd.DataFrame(comparison_data)
+    
+    # Calculate improvement percentages
+    improvement = []
+    for i in range(len(comparison_df)):
+        metric_name = comparison_df.iloc[i, 0]
+        
+        # Extract numeric values
+        super_val = float(comparison_df.iloc[i, 1].replace(',', '').replace('%', '').replace('$', ''))
+        meta_val = float(comparison_df.iloc[i, 2].replace(',', '').replace('%', '').replace('$', ''))
+        
+        # Calculate improvement based on metric type
+        if 'Drawdown' in metric_name:
+            # Lower is better for drawdown
+            imp = ((super_val - meta_val) / super_val * 100) if super_val != 0 else 0
+        else:
+            # Higher is better for all other metrics
+            imp = ((meta_val - super_val) / super_val * 100) if super_val != 0 else 0
+        
+        improvement.append(f"{imp:+.1f}%")
+    
+    comparison_df['Improvement'] = improvement
+    
+    return comparison_df
+
+
+def print_final_statistics(super_metrics, meta_metrics, test_periods):
+    """
+    Print comprehensive final statistics comparing super and meta agents.
+    
+    Args:
+        super_metrics: Dictionary of metrics from super agent test evaluation
+        meta_metrics: Dictionary of metrics from meta agent test evaluation
+        test_periods: Number of test periods (months)
+    """
+    comparison_df = create_performance_comparison_table(super_metrics, meta_metrics, test_periods)
+    
+    print("\n" + "="*80)
+    print("HIERARCHICAL AGENT TEST SET PERFORMANCE COMPARISON")
+    print("="*80)
+    print(comparison_df.to_string(index=False))
+    print("="*80)
+    print("\nNote: Positive improvement % is better for all metrics")
+    print("      (including Max Drawdown, where reduction = improvement)")
+    
+    # Print key highlights
+    sharpe_improvement = ((meta_metrics['sharpe_ratio'] - super_metrics['sharpe_ratio']) / 
+                          super_metrics['sharpe_ratio'] * 100)
+    return_improvement = ((meta_metrics['total_return'] - super_metrics['total_return']) / 
+                          super_metrics['total_return'] * 100)
+    
+    print("\n" + "="*80)
+    print("KEY HIGHLIGHTS")
+    print("="*80)
+    print(f"Meta Agent Sharpe Ratio Improvement: {sharpe_improvement:+.1f}%")
+    print(f"Meta Agent Total Return Improvement: {return_improvement:+.1f}%")
+    print(f"Meta Agent Final Portfolio Value: ${meta_metrics['final_value']:,.2f}")
+    print("="*80)

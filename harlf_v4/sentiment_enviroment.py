@@ -8,13 +8,13 @@ Key Features:
 - NaN handling
 """
 
-import gym
-from gym import spaces
+import gymnasium
+from gymnasium import spaces
 import numpy as np
 import pandas as pd
 
 
-class SentimentEnv(gym.Env):
+class SentimentEnv(gymnasium.Env):
     """
     Sentiment-based trading environment for portfolio optimization.
     
@@ -22,7 +22,9 @@ class SentimentEnv(gym.Env):
     """
     
     def __init__(self, price_data, sentiment_features, initial_capital=100000, 
-                 vol_window=3, transaction_cost=0.001, verbose=0):
+                 transaction_cost=0.001, verbose=0,
+                 alpha_returns=1.0, alpha_mdd=0.3, alpha_vol=0.3, exploration_bias=0.01,
+                 vol_window=None, **kwargs):
         super().__init__()
         
         # Store data
@@ -32,9 +34,19 @@ class SentimentEnv(gym.Env):
         self.initial_capital = initial_capital
         
         # Risk and cost parameters
-        self.vol_window = vol_window
         self.transaction_cost = transaction_cost
         self.verbose = verbose
+        
+        # Aligned reward function parameters (matching super/meta hierarchy)
+        # Base agents use slightly lower penalties to encourage exploration
+        self.alpha_returns = alpha_returns
+        self.alpha_mdd = alpha_mdd
+        self.alpha_vol = alpha_vol
+        self.exploration_bias = exploration_bias
+        
+        # Backward compatibility: vol_window is no longer used with aligned reward
+        if vol_window is not None and verbose > 0:
+            print(f"Warning: vol_window parameter is deprecated and ignored with aligned reward function.")
         
         # For risk-adjusted returns calculation
         self.returns_history = []
@@ -157,22 +169,30 @@ class SentimentEnv(gym.Env):
         self.portfolio_value *= (1 + portfolio_return)
         self.portfolio_history.append(self.portfolio_value)
         
-        # Calculate risk-adjusted reward (Sharpe-like ratio)
-        recent_returns = self.returns_history[-self.vol_window:]
-        if len(recent_returns) >= 2:
-            mean_return = np.mean(recent_returns)
-            # Use ddof=1 for unbiased variance estimator (Bessel's correction)
-            volatility = np.std(recent_returns, ddof=1)
-            if volatility > 1e-6:
-                sharpe_like = mean_return / volatility
-            else:
-                # If zero volatility, reward is just mean return scaled up
-                sharpe_like = mean_return * 10
-            # Clip extreme values to prevent training instability
-            reward = np.clip(sharpe_like, -10, 10)
+        # Calculate aligned composite reward (matching super/meta agents)
+        # This ensures coherent objectives throughout the hierarchy
+        
+        # Maximum drawdown
+        if len(self.portfolio_history) > 1:
+            portfolio_series = pd.Series(self.portfolio_history)
+            peak = portfolio_series.expanding().max()
+            drawdown = (portfolio_series - peak) / peak
+            current_mdd = abs(drawdown.iloc[-1])
         else:
-            # Fallback to raw return when insufficient history
-            reward = portfolio_return
+            current_mdd = 0.0
+        
+        # Volatility (recent)
+        if len(self.returns_history) > 1:
+            volatility = np.std(self.returns_history)
+        else:
+            volatility = 0.0
+        
+        # Composite reward aligned with hierarchy
+        # Base agents use lower penalties than super/meta to encourage exploration
+        reward = (self.alpha_returns * portfolio_log_return - 
+                 self.alpha_mdd * current_mdd - 
+                 self.alpha_vol * volatility + 
+                 self.exploration_bias)
 
         # Store weights and increment step
         self.weights = weights
