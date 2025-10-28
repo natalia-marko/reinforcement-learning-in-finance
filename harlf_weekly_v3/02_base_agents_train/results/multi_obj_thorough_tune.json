@@ -1,0 +1,920 @@
+{
+  "best_value": 2.799889963487175,
+  "best_params": {
+    "gamma": 0.86,
+    "softmax_temperature": 0.5,
+    "learning_rate": 0.0002785042249818912,
+    "return_scale": 6.5,
+    "volatility_penalty": 0.08,
+    "concentration_penalty": 0.5,
+    "turnover_penalty": 0.004,
+    "vol_window": 12,
+    "transaction_cost": 0.0025,
+    "max_concentration": 0.25,
+    "patience": 10
+  },
+  "best_trial": 9,
+  "n_trials": 50,
+  "trials": [
+    {
+      "number": 0,
+      "value": 2.6638409225114037,
+      "params": {
+        "gamma": 0.89,
+        "softmax_temperature": 2.0,
+        "learning_rate": 0.0003248192869770293,
+        "return_scale": 9.0,
+        "volatility_penalty": 0.03,
+        "concentration_penalty": 0.15000000000000002,
+        "turnover_penalty": 0.002,
+        "vol_window": 20,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.35,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 1,
+      "value": 2.430014634269279,
+      "params": {
+        "gamma": 0.95,
+        "softmax_temperature": 1.8,
+        "learning_rate": 0.00014074036373847487,
+        "return_scale": 5.5,
+        "volatility_penalty": 0.03,
+        "concentration_penalty": 0.2,
+        "turnover_penalty": 0.006,
+        "vol_window": 14,
+        "transaction_cost": 0.0015,
+        "max_concentration": 0.35,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 2,
+      "value": 2.143406535454449,
+      "params": {
+        "gamma": 0.88,
+        "softmax_temperature": 1.0,
+        "learning_rate": 0.000208343156115295,
+        "return_scale": 10.5,
+        "volatility_penalty": 0.03,
+        "concentration_penalty": 0.30000000000000004,
+        "turnover_penalty": 0.007,
+        "vol_window": 8,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.25,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 3,
+      "value": 2.79477628793969,
+      "params": {
+        "gamma": 0.95,
+        "softmax_temperature": 2.0,
+        "learning_rate": 0.00036732078004620474,
+        "return_scale": 6.5,
+        "volatility_penalty": 0.02,
+        "concentration_penalty": 0.4,
+        "turnover_penalty": 0.005,
+        "vol_window": 8,
+        "transaction_cost": 0.002,
+        "max_concentration": 0.25,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 4,
+      "value": 2.111019970434354,
+      "params": {
+        "gamma": 0.87,
+        "softmax_temperature": 1.5,
+        "learning_rate": 0.00016514928287652894,
+        "return_scale": 8.0,
+        "volatility_penalty": 0.09,
+        "concentration_penalty": 0.15000000000000002,
+        "turnover_penalty": 0.01,
+        "vol_window": 18,
+        "transaction_cost": 0.003,
+        "max_concentration": 0.4,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 5,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.95,
+        "softmax_temperature": 0.6,
+        "learning_rate": 0.0001370838023704289,
+        "return_scale": 4.0,
+        "volatility_penalty": 0.05,
+        "concentration_penalty": 0.25,
+        "turnover_penalty": 0.004,
+        "vol_window": 18,
+        "transaction_cost": 0.0015,
+        "max_concentration": 0.3,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 6,
+      "value": 2.49057398188975,
+      "params": {
+        "gamma": 0.86,
+        "softmax_temperature": 1.7000000000000002,
+        "learning_rate": 0.00011274795247181465,
+        "return_scale": 12.0,
+        "volatility_penalty": 0.12,
+        "concentration_penalty": 0.15000000000000002,
+        "turnover_penalty": 0.002,
+        "vol_window": 18,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.35,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 7,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.85,
+        "softmax_temperature": 1.0,
+        "learning_rate": 0.00012050054108660758,
+        "return_scale": 11.0,
+        "volatility_penalty": 0.09999999999999999,
+        "concentration_penalty": 0.2,
+        "turnover_penalty": 0.002,
+        "vol_window": 12,
+        "transaction_cost": 0.0015,
+        "max_concentration": 0.35,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 8,
+      "value": 2.4265186262998966,
+      "params": {
+        "gamma": 0.94,
+        "softmax_temperature": 1.2000000000000002,
+        "learning_rate": 0.00012122516686859985,
+        "return_scale": 10.0,
+        "volatility_penalty": 0.12,
+        "concentration_penalty": 0.35,
+        "turnover_penalty": 0.008,
+        "vol_window": 14,
+        "transaction_cost": 0.002,
+        "max_concentration": 0.3,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 9,
+      "value": 2.799889963487175,
+      "params": {
+        "gamma": 0.86,
+        "softmax_temperature": 0.5,
+        "learning_rate": 0.0002785042249818912,
+        "return_scale": 6.5,
+        "volatility_penalty": 0.08,
+        "concentration_penalty": 0.5,
+        "turnover_penalty": 0.004,
+        "vol_window": 12,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.25,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 10,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.88,
+        "softmax_temperature": 0.7,
+        "learning_rate": 0.0004465095705856792,
+        "return_scale": 10.5,
+        "volatility_penalty": 0.09999999999999999,
+        "concentration_penalty": 0.45000000000000007,
+        "turnover_penalty": 0.009000000000000001,
+        "vol_window": 10,
+        "transaction_cost": 0.003,
+        "max_concentration": 0.35,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 11,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.94,
+        "softmax_temperature": 1.0,
+        "learning_rate": 0.00011937764142294184,
+        "return_scale": 5.5,
+        "volatility_penalty": 0.06999999999999999,
+        "concentration_penalty": 0.45000000000000007,
+        "turnover_penalty": 0.009000000000000001,
+        "vol_window": 8,
+        "transaction_cost": 0.002,
+        "max_concentration": 0.3,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 12,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.86,
+        "softmax_temperature": 1.0,
+        "learning_rate": 0.0004561058051633794,
+        "return_scale": 6.5,
+        "volatility_penalty": 0.08,
+        "concentration_penalty": 0.4,
+        "turnover_penalty": 0.005,
+        "vol_window": 20,
+        "transaction_cost": 0.003,
+        "max_concentration": 0.3,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 13,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.88,
+        "softmax_temperature": 0.9,
+        "learning_rate": 0.00010611648836317456,
+        "return_scale": 9.0,
+        "volatility_penalty": 0.08,
+        "concentration_penalty": 0.1,
+        "turnover_penalty": 0.004,
+        "vol_window": 20,
+        "transaction_cost": 0.0015,
+        "max_concentration": 0.25,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 14,
+      "value": 2.2675732959614314,
+      "params": {
+        "gamma": 0.95,
+        "softmax_temperature": 0.8,
+        "learning_rate": 0.00029498680256690845,
+        "return_scale": 10.0,
+        "volatility_penalty": 0.04,
+        "concentration_penalty": 0.4,
+        "turnover_penalty": 0.005,
+        "vol_window": 16,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.35,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 15,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.9199999999999999,
+        "softmax_temperature": 0.5,
+        "learning_rate": 0.0003309647159891208,
+        "return_scale": 7.0,
+        "volatility_penalty": 0.01,
+        "concentration_penalty": 0.5,
+        "turnover_penalty": 0.004,
+        "vol_window": 10,
+        "transaction_cost": 0.001,
+        "max_concentration": 0.25,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 16,
+      "value": 2.3256536023514873,
+      "params": {
+        "gamma": 0.9099999999999999,
+        "softmax_temperature": 1.4,
+        "learning_rate": 0.0002587321491688827,
+        "return_scale": 4.0,
+        "volatility_penalty": 0.15,
+        "concentration_penalty": 0.5,
+        "turnover_penalty": 0.006,
+        "vol_window": 12,
+        "transaction_cost": 0.002,
+        "max_concentration": 0.25,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 17,
+      "value": 2.4673785855151364,
+      "params": {
+        "gamma": 0.9199999999999999,
+        "softmax_temperature": 1.9000000000000001,
+        "learning_rate": 0.00040205362697053753,
+        "return_scale": 6.5,
+        "volatility_penalty": 0.01,
+        "concentration_penalty": 0.35,
+        "turnover_penalty": 0.003,
+        "vol_window": 10,
+        "transaction_cost": 0.001,
+        "max_concentration": 0.25,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 18,
+      "value": 2.7983859003085,
+      "params": {
+        "gamma": 0.9,
+        "softmax_temperature": 1.6,
+        "learning_rate": 0.00021013971681095215,
+        "return_scale": 5.5,
+        "volatility_penalty": 0.060000000000000005,
+        "concentration_penalty": 0.45000000000000007,
+        "turnover_penalty": 0.006,
+        "vol_window": 12,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.4,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 19,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.9,
+        "softmax_temperature": 1.6,
+        "learning_rate": 0.00020583634707259843,
+        "return_scale": 5.0,
+        "volatility_penalty": 0.060000000000000005,
+        "concentration_penalty": 0.5,
+        "turnover_penalty": 0.007,
+        "vol_window": 14,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.4,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 20,
+      "value": 2.3375760017076117,
+      "params": {
+        "gamma": 0.9,
+        "softmax_temperature": 1.3,
+        "learning_rate": 0.00025625698159158325,
+        "return_scale": 7.5,
+        "volatility_penalty": 0.060000000000000005,
+        "concentration_penalty": 0.45000000000000007,
+        "turnover_penalty": 0.006,
+        "vol_window": 12,
+        "transaction_cost": 0.003,
+        "max_concentration": 0.4,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 21,
+      "value": 2.345051031052909,
+      "params": {
+        "gamma": 0.9299999999999999,
+        "softmax_temperature": 2.0,
+        "learning_rate": 0.00018354909312917603,
+        "return_scale": 6.0,
+        "volatility_penalty": 0.05,
+        "concentration_penalty": 0.4,
+        "turnover_penalty": 0.005,
+        "vol_window": 8,
+        "transaction_cost": 0.002,
+        "max_concentration": 0.3,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 22,
+      "value": 2.377952270197125,
+      "params": {
+        "gamma": 0.85,
+        "softmax_temperature": 1.7000000000000002,
+        "learning_rate": 0.000370323660633158,
+        "return_scale": 8.0,
+        "volatility_penalty": 0.12,
+        "concentration_penalty": 0.45000000000000007,
+        "turnover_penalty": 0.003,
+        "vol_window": 10,
+        "transaction_cost": 0.002,
+        "max_concentration": 0.25,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 23,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.9099999999999999,
+        "softmax_temperature": 1.5,
+        "learning_rate": 0.0002604417008557245,
+        "return_scale": 5.0,
+        "volatility_penalty": 0.02,
+        "concentration_penalty": 0.35,
+        "turnover_penalty": 0.007,
+        "vol_window": 12,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.4,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 24,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.89,
+        "softmax_temperature": 1.2000000000000002,
+        "learning_rate": 0.00023024874124557743,
+        "return_scale": 7.0,
+        "volatility_penalty": 0.06999999999999999,
+        "concentration_penalty": 0.5,
+        "turnover_penalty": 0.005,
+        "vol_window": 12,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.25,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 25,
+      "value": 2.7630794948932005,
+      "params": {
+        "gamma": 0.9299999999999999,
+        "softmax_temperature": 1.8,
+        "learning_rate": 0.0003071669824522853,
+        "return_scale": 5.0,
+        "volatility_penalty": 0.09999999999999999,
+        "concentration_penalty": 0.4,
+        "turnover_penalty": 0.003,
+        "vol_window": 16,
+        "transaction_cost": 0.002,
+        "max_concentration": 0.3,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 26,
+      "value": 2.777398882982506,
+      "params": {
+        "gamma": 0.87,
+        "softmax_temperature": 1.9000000000000001,
+        "learning_rate": 0.00037048875778746546,
+        "return_scale": 6.0,
+        "volatility_penalty": 0.05,
+        "concentration_penalty": 0.30000000000000004,
+        "turnover_penalty": 0.004,
+        "vol_window": 10,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.25,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 27,
+      "value": 2.374449485364725,
+      "params": {
+        "gamma": 0.9099999999999999,
+        "softmax_temperature": 1.4,
+        "learning_rate": 0.00017332546462679442,
+        "return_scale": 9.0,
+        "volatility_penalty": 0.06999999999999999,
+        "concentration_penalty": 0.45000000000000007,
+        "turnover_penalty": 0.005,
+        "vol_window": 8,
+        "transaction_cost": 0.003,
+        "max_concentration": 0.3,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 28,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.89,
+        "softmax_temperature": 1.6,
+        "learning_rate": 0.00023377288703613395,
+        "return_scale": 4.5,
+        "volatility_penalty": 0.04,
+        "concentration_penalty": 0.5,
+        "turnover_penalty": 0.007,
+        "vol_window": 16,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.4,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 29,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.86,
+        "softmax_temperature": 2.0,
+        "learning_rate": 0.00035036489246157093,
+        "return_scale": 8.0,
+        "volatility_penalty": 0.02,
+        "concentration_penalty": 0.35,
+        "turnover_penalty": 0.006,
+        "vol_window": 14,
+        "transaction_cost": 0.002,
+        "max_concentration": 0.25,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 30,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.9199999999999999,
+        "softmax_temperature": 0.5,
+        "learning_rate": 0.00027849036850282954,
+        "return_scale": 6.0,
+        "volatility_penalty": 0.09,
+        "concentration_penalty": 0.4,
+        "turnover_penalty": 0.003,
+        "vol_window": 10,
+        "transaction_cost": 0.002,
+        "max_concentration": 0.3,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 31,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.87,
+        "softmax_temperature": 1.9000000000000001,
+        "learning_rate": 0.0003951743670346802,
+        "return_scale": 6.0,
+        "volatility_penalty": 0.05,
+        "concentration_penalty": 0.30000000000000004,
+        "turnover_penalty": 0.004,
+        "vol_window": 10,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.25,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 32,
+      "value": 2.2977061624976973,
+      "params": {
+        "gamma": 0.87,
+        "softmax_temperature": 1.9000000000000001,
+        "learning_rate": 0.0004926493598441965,
+        "return_scale": 7.0,
+        "volatility_penalty": 0.04,
+        "concentration_penalty": 0.25,
+        "turnover_penalty": 0.004,
+        "vol_window": 8,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.25,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 33,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.85,
+        "softmax_temperature": 1.8,
+        "learning_rate": 0.00032649734045239986,
+        "return_scale": 5.5,
+        "volatility_penalty": 0.060000000000000005,
+        "concentration_penalty": 0.25,
+        "turnover_penalty": 0.005,
+        "vol_window": 12,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.25,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 34,
+      "value": 2.441176271855554,
+      "params": {
+        "gamma": 0.87,
+        "softmax_temperature": 2.0,
+        "learning_rate": 0.00019711261141400958,
+        "return_scale": 6.5,
+        "volatility_penalty": 0.03,
+        "concentration_penalty": 0.45000000000000007,
+        "turnover_penalty": 0.006,
+        "vol_window": 10,
+        "transaction_cost": 0.003,
+        "max_concentration": 0.25,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 35,
+      "value": 2.7158946688789327,
+      "params": {
+        "gamma": 0.88,
+        "softmax_temperature": 1.6,
+        "learning_rate": 0.0004024250196087183,
+        "return_scale": 7.5,
+        "volatility_penalty": 0.03,
+        "concentration_penalty": 0.30000000000000004,
+        "turnover_penalty": 0.004,
+        "vol_window": 14,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.25,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 36,
+      "value": 2.6681550539857137,
+      "params": {
+        "gamma": 0.86,
+        "softmax_temperature": 1.8,
+        "learning_rate": 0.00015555330610032345,
+        "return_scale": 4.5,
+        "volatility_penalty": 0.02,
+        "concentration_penalty": 0.2,
+        "turnover_penalty": 0.003,
+        "vol_window": 8,
+        "transaction_cost": 0.0015,
+        "max_concentration": 0.3,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 37,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.89,
+        "softmax_temperature": 1.7000000000000002,
+        "learning_rate": 0.0003578986767170521,
+        "return_scale": 6.0,
+        "volatility_penalty": 0.09,
+        "concentration_penalty": 0.5,
+        "turnover_penalty": 0.002,
+        "vol_window": 12,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.25,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 38,
+      "value": 2.3679523095975825,
+      "params": {
+        "gamma": 0.85,
+        "softmax_temperature": 1.9000000000000001,
+        "learning_rate": 0.00030573262547880836,
+        "return_scale": 8.5,
+        "volatility_penalty": 0.05,
+        "concentration_penalty": 0.35,
+        "turnover_penalty": 0.007,
+        "vol_window": 10,
+        "transaction_cost": 0.003,
+        "max_concentration": 0.35,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 39,
+      "value": 2.3102234093050678,
+      "params": {
+        "gamma": 0.86,
+        "softmax_temperature": 1.1,
+        "learning_rate": 0.00023725581909635494,
+        "return_scale": 7.5,
+        "volatility_penalty": 0.08,
+        "concentration_penalty": 0.45000000000000007,
+        "turnover_penalty": 0.008,
+        "vol_window": 8,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.4,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 40,
+      "value": 2.385062276803616,
+      "params": {
+        "gamma": 0.87,
+        "softmax_temperature": 1.5,
+        "learning_rate": 0.00028175963366538,
+        "return_scale": 5.5,
+        "volatility_penalty": 0.060000000000000005,
+        "concentration_penalty": 0.30000000000000004,
+        "turnover_penalty": 0.006,
+        "vol_window": 12,
+        "transaction_cost": 0.002,
+        "max_concentration": 0.3,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 41,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.94,
+        "softmax_temperature": 1.8,
+        "learning_rate": 0.000310868365026151,
+        "return_scale": 5.0,
+        "volatility_penalty": 0.11,
+        "concentration_penalty": 0.4,
+        "turnover_penalty": 0.003,
+        "vol_window": 16,
+        "transaction_cost": 0.002,
+        "max_concentration": 0.3,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 42,
+      "value": 2.753847668281676,
+      "params": {
+        "gamma": 0.95,
+        "softmax_temperature": 1.7000000000000002,
+        "learning_rate": 0.0004345637066969009,
+        "return_scale": 5.0,
+        "volatility_penalty": 0.09999999999999999,
+        "concentration_penalty": 0.4,
+        "turnover_penalty": 0.002,
+        "vol_window": 14,
+        "transaction_cost": 0.002,
+        "max_concentration": 0.35,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 43,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.9299999999999999,
+        "softmax_temperature": 1.8,
+        "learning_rate": 0.00033922640528635296,
+        "return_scale": 4.5,
+        "volatility_penalty": 0.13,
+        "concentration_penalty": 0.45000000000000007,
+        "turnover_penalty": 0.004,
+        "vol_window": 16,
+        "transaction_cost": 0.0015,
+        "max_concentration": 0.25,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 44,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.9299999999999999,
+        "softmax_temperature": 2.0,
+        "learning_rate": 0.00021582298200339495,
+        "return_scale": 6.5,
+        "volatility_penalty": 0.09,
+        "concentration_penalty": 0.4,
+        "turnover_penalty": 0.005,
+        "vol_window": 14,
+        "transaction_cost": 0.002,
+        "max_concentration": 0.3,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 45,
+      "value": 2.533856256328775,
+      "params": {
+        "gamma": 0.94,
+        "softmax_temperature": 1.9000000000000001,
+        "learning_rate": 0.0003861023135484458,
+        "return_scale": 4.0,
+        "volatility_penalty": 0.11,
+        "concentration_penalty": 0.35,
+        "turnover_penalty": 0.003,
+        "vol_window": 18,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.35,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 46,
+      "value": 2.309021792504165,
+      "params": {
+        "gamma": 0.95,
+        "softmax_temperature": 0.7,
+        "learning_rate": 0.0002932173716754251,
+        "return_scale": 5.5,
+        "volatility_penalty": 0.08,
+        "concentration_penalty": 0.1,
+        "turnover_penalty": 0.004,
+        "vol_window": 10,
+        "transaction_cost": 0.0015,
+        "max_concentration": 0.3,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 47,
+      "value": 2.446986514288892,
+      "params": {
+        "gamma": 0.88,
+        "softmax_temperature": 1.7000000000000002,
+        "learning_rate": 0.00027094064689621753,
+        "return_scale": 7.0,
+        "volatility_penalty": 0.06999999999999999,
+        "concentration_penalty": 0.45000000000000007,
+        "turnover_penalty": 0.005,
+        "vol_window": 18,
+        "transaction_cost": 0.002,
+        "max_concentration": 0.25,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 48,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.9299999999999999,
+        "softmax_temperature": 1.8,
+        "learning_rate": 0.0003137692001992407,
+        "return_scale": 5.5,
+        "volatility_penalty": 0.09999999999999999,
+        "concentration_penalty": 0.2,
+        "turnover_penalty": 0.002,
+        "vol_window": 8,
+        "transaction_cost": 0.002,
+        "max_concentration": 0.25,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 49,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.9,
+        "softmax_temperature": 0.9,
+        "learning_rate": 0.0004293147753641968,
+        "return_scale": 12.0,
+        "volatility_penalty": 0.11,
+        "concentration_penalty": 0.5,
+        "turnover_penalty": 0.01,
+        "vol_window": 12,
+        "transaction_cost": 0.0025,
+        "max_concentration": 0.25,
+        "patience": 15
+      },
+      "state": "1"
+    }
+  ]
+}

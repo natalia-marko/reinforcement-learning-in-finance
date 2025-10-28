@@ -1,0 +1,405 @@
+{
+  "best_value": 2.627,
+  "best_params": {
+    "gamma": 0.9199999999999999,
+    "softmax_temperature": 1.1,
+    "learning_rate": 0.00033199182215925145,
+    "rolling_vol_window": 14,
+    "transaction_cost": 0.0015,
+    "patience": 10
+  },
+  "best_trial": 15,
+  "n_trials": 30,
+  "trials": [
+    {
+      "number": 0,
+      "value": 2.437,
+      "params": {
+        "gamma": 0.89,
+        "softmax_temperature": 2.0,
+        "learning_rate": 0.0003248192869770293,
+        "rolling_vol_window": 12,
+        "transaction_cost": 0.001,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 1,
+      "value": 2.284,
+      "params": {
+        "gamma": 0.85,
+        "softmax_temperature": 1.8,
+        "learning_rate": 0.000263124545105745,
+        "rolling_vol_window": 12,
+        "transaction_cost": 0.001,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 2,
+      "value": 2.294,
+      "params": {
+        "gamma": 0.94,
+        "softmax_temperature": 0.8,
+        "learning_rate": 0.00013399549522183018,
+        "rolling_vol_window": 6,
+        "transaction_cost": 0.0015,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 3,
+      "value": 2.364,
+      "params": {
+        "gamma": 0.89,
+        "softmax_temperature": 0.9,
+        "learning_rate": 0.0002677113724214593,
+        "rolling_vol_window": 4,
+        "transaction_cost": 0.0015,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 4,
+      "value": 2.437,
+      "params": {
+        "gamma": 0.9,
+        "softmax_temperature": 1.7000000000000002,
+        "learning_rate": 0.00013790054557672574,
+        "rolling_vol_window": 10,
+        "transaction_cost": 0.002,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 5,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.9099999999999999,
+        "softmax_temperature": 0.7,
+        "learning_rate": 0.00011103735608516835,
+        "rolling_vol_window": 16,
+        "transaction_cost": 0.003,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 6,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.88,
+        "softmax_temperature": 0.6,
+        "learning_rate": 0.0003007865147526456,
+        "rolling_vol_window": 10,
+        "transaction_cost": 0.001,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 7,
+      "value": 2.322,
+      "params": {
+        "gamma": 0.85,
+        "softmax_temperature": 1.9000000000000001,
+        "learning_rate": 0.00015166293102182276,
+        "rolling_vol_window": 12,
+        "transaction_cost": 0.0015,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 8,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.9099999999999999,
+        "softmax_temperature": 0.7,
+        "learning_rate": 0.0004761135828626514,
+        "rolling_vol_window": 14,
+        "transaction_cost": 0.003,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 9,
+      "value": 2.42,
+      "params": {
+        "gamma": 0.9099999999999999,
+        "softmax_temperature": 1.9000000000000001,
+        "learning_rate": 0.00011530645080977568,
+        "rolling_vol_window": 6,
+        "transaction_cost": 0.001,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 10,
+      "value": 2.321,
+      "params": {
+        "gamma": 0.95,
+        "softmax_temperature": 1.3,
+        "learning_rate": 0.0004362398022408675,
+        "rolling_vol_window": 16,
+        "transaction_cost": 0.0025,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 11,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.88,
+        "softmax_temperature": 1.5,
+        "learning_rate": 0.00019187240311803195,
+        "rolling_vol_window": 10,
+        "transaction_cost": 0.002,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 12,
+      "value": 2.414,
+      "params": {
+        "gamma": 0.9299999999999999,
+        "softmax_temperature": 1.6,
+        "learning_rate": 0.0003635346814215662,
+        "rolling_vol_window": 8,
+        "transaction_cost": 0.002,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 13,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.87,
+        "softmax_temperature": 2.0,
+        "learning_rate": 0.0002019958817434238,
+        "rolling_vol_window": 12,
+        "transaction_cost": 0.0025,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 14,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.9,
+        "softmax_temperature": 1.6,
+        "learning_rate": 0.0001606133190858908,
+        "rolling_vol_window": 8,
+        "transaction_cost": 0.0025,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 15,
+      "value": 2.627,
+      "params": {
+        "gamma": 0.9199999999999999,
+        "softmax_temperature": 1.1,
+        "learning_rate": 0.00033199182215925145,
+        "rolling_vol_window": 14,
+        "transaction_cost": 0.0015,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 16,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.9299999999999999,
+        "softmax_temperature": 1.0,
+        "learning_rate": 0.00035111248259653055,
+        "rolling_vol_window": 14,
+        "transaction_cost": 0.0015,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 17,
+      "value": 2.581,
+      "params": {
+        "gamma": 0.9199999999999999,
+        "softmax_temperature": 1.2000000000000002,
+        "learning_rate": 0.0003745290373876055,
+        "rolling_vol_window": 14,
+        "transaction_cost": 0.001,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 18,
+      "value": 2.479,
+      "params": {
+        "gamma": 0.9299999999999999,
+        "softmax_temperature": 1.2000000000000002,
+        "learning_rate": 0.00040965330868691517,
+        "rolling_vol_window": 14,
+        "transaction_cost": 0.0015,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 19,
+      "value": 2.465,
+      "params": {
+        "gamma": 0.9199999999999999,
+        "softmax_temperature": 1.2000000000000002,
+        "learning_rate": 0.0002346088405835858,
+        "rolling_vol_window": 16,
+        "transaction_cost": 0.001,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 20,
+      "value": 2.484,
+      "params": {
+        "gamma": 0.95,
+        "softmax_temperature": 1.4,
+        "learning_rate": 0.0003978496168642729,
+        "rolling_vol_window": 14,
+        "transaction_cost": 0.0015,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 21,
+      "value": 2.529,
+      "params": {
+        "gamma": 0.95,
+        "softmax_temperature": 1.4,
+        "learning_rate": 0.0004986206888142484,
+        "rolling_vol_window": 14,
+        "transaction_cost": 0.0015,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 22,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.94,
+        "softmax_temperature": 1.1,
+        "learning_rate": 0.0004902314664325734,
+        "rolling_vol_window": 14,
+        "transaction_cost": 0.0015,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 23,
+      "value": 2.343,
+      "params": {
+        "gamma": 0.9199999999999999,
+        "softmax_temperature": 1.4,
+        "learning_rate": 0.00029661247763441555,
+        "rolling_vol_window": 16,
+        "transaction_cost": 0.001,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 24,
+      "value": 2.353,
+      "params": {
+        "gamma": 0.94,
+        "softmax_temperature": 1.1,
+        "learning_rate": 0.00037645160784907704,
+        "rolling_vol_window": 12,
+        "transaction_cost": 0.002,
+        "patience": 10
+      },
+      "state": "1"
+    },
+    {
+      "number": 25,
+      "value": 2.536,
+      "params": {
+        "gamma": 0.9199999999999999,
+        "softmax_temperature": 1.0,
+        "learning_rate": 0.00044875135412875995,
+        "rolling_vol_window": 14,
+        "transaction_cost": 0.0015,
+        "patience": 15
+      },
+      "state": "1"
+    },
+    {
+      "number": 26,
+      "value": 2.595,
+      "params": {
+        "gamma": 0.9199999999999999,
+        "softmax_temperature": 1.0,
+        "learning_rate": 0.0004323319288433952,
+        "rolling_vol_window": 16,
+        "transaction_cost": 0.001,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 27,
+      "value": 2.379,
+      "params": {
+        "gamma": 0.9199999999999999,
+        "softmax_temperature": 0.5,
+        "learning_rate": 0.000332277041737614,
+        "rolling_vol_window": 16,
+        "transaction_cost": 0.001,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 28,
+      "value": -1.0,
+      "params": {
+        "gamma": 0.9099999999999999,
+        "softmax_temperature": 0.9,
+        "learning_rate": 0.00025040425857161965,
+        "rolling_vol_window": 16,
+        "transaction_cost": 0.001,
+        "patience": 20
+      },
+      "state": "1"
+    },
+    {
+      "number": 29,
+      "value": 2.531,
+      "params": {
+        "gamma": 0.89,
+        "softmax_temperature": 1.0,
+        "learning_rate": 0.00030244554291907546,
+        "rolling_vol_window": 12,
+        "transaction_cost": 0.001,
+        "patience": 20
+      },
+      "state": "1"
+    }
+  ]
+}

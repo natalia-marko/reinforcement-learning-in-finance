@@ -1,0 +1,63 @@
+{
+  "comparison": [
+    {
+      "agent_type": "technical",
+      "algorithm": "PPO",
+      "reward_type": "ema_sharpe",
+      "train_sharpe": 1.321,
+      "val_sharpe": 2.303,
+      "test_sharpe": 1.045,
+      "model_path": "../models/technical/ema_sharpe/ema_sharpe_technical_ppo.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    },
+    {
+      "agent_type": "technical",
+      "algorithm": "PPO",
+      "reward_type": "differential_sharpe",
+      "train_sharpe": 1.385,
+      "val_sharpe": 2.343,
+      "test_sharpe": 0.989,
+      "model_path": "../models/technical/differential_sharpe/differential_sharpe_technical_ppo.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    },
+    {
+      "agent_type": "technical",
+      "algorithm": "PPO",
+      "reward_type": "multi_objective",
+      "train_sharpe": 2.818,
+      "val_sharpe": 2.261,
+      "test_sharpe": 1.331,
+      "model_path": "../models/technical/multi_objective/multi_objective_technical_ppo.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    },
+    {
+      "agent_type": "technical",
+      "algorithm": "PPO",
+      "reward_type": "simple_return",
+      "train_sharpe": 1.009,
+      "val_sharpe": 2.248,
+      "test_sharpe": 1.031,
+      "model_path": "../models/technical/simple_return/simple_return_technical_ppo.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    }
+  ],
+  "best": {
+    "agent_type": "technical",
+    "algorithm": "PPO",
+    "reward_type": "multi_objective",
+    "train_sharpe": 2.818,
+    "val_sharpe": 2.261,
+    "test_sharpe": 1.331,
+    "gamma": 0.9,
+    "softmax_temperature": 1.0,
+    "transaction_cost": 0.0025
+  }
+}

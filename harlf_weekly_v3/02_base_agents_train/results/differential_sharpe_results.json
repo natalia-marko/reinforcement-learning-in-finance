@@ -1,0 +1,103 @@
+{
+  "approach": "differential_sharpe",
+  "technical_results": [
+    {
+      "agent_type": "technical",
+      "algorithm": "PPO",
+      "reward_type": "differential_sharpe",
+      "train_sharpe": 4.519364833831787,
+      "val_sharpe": 2.2708916664123535,
+      "test_sharpe": 1.065184235572815,
+      "model_path": "../models/technical/differential_sharpe/differential_sharpe_technical_ppo.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    },
+    {
+      "agent_type": "technical",
+      "algorithm": "SAC",
+      "reward_type": "differential_sharpe",
+      "train_sharpe": 2.2911603450775146,
+      "val_sharpe": 2.2590830326080322,
+      "test_sharpe": 0.6217846274375916,
+      "model_path": "../models/technical/differential_sharpe/differential_sharpe_technical_sac.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    },
+    {
+      "agent_type": "technical",
+      "algorithm": "A2C",
+      "reward_type": "differential_sharpe",
+      "train_sharpe": 0.9177358150482178,
+      "val_sharpe": 2.485142230987549,
+      "test_sharpe": 0.7706461548805237,
+      "model_path": "../models/technical/differential_sharpe/differential_sharpe_technical_a2c.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    }
+  ],
+  "sentiment_results": [
+    {
+      "agent_type": "sentiment",
+      "algorithm": "PPO",
+      "reward_type": "differential_sharpe",
+      "train_sharpe": 0.4347774088382721,
+      "val_sharpe": 2.2776007652282715,
+      "test_sharpe": 1.037638545036316,
+      "model_path": "../models/sentiment/differential_sharpe/differential_sharpe_sentiment_ppo.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    },
+    {
+      "agent_type": "sentiment",
+      "algorithm": "SAC",
+      "reward_type": "differential_sharpe",
+      "train_sharpe": 4.733973503112793,
+      "val_sharpe": 2.3689780235290527,
+      "test_sharpe": 0.9688931703567505,
+      "model_path": "../models/sentiment/differential_sharpe/differential_sharpe_sentiment_sac.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    },
+    {
+      "agent_type": "sentiment",
+      "algorithm": "A2C",
+      "reward_type": "differential_sharpe",
+      "train_sharpe": 2.783724784851074,
+      "val_sharpe": 2.621238946914673,
+      "test_sharpe": 0.7139829993247986,
+      "model_path": "../models/sentiment/differential_sharpe/differential_sharpe_sentiment_a2c.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    }
+  ],
+  "best_technical": {
+    "agent_type": "technical",
+    "algorithm": "PPO",
+    "reward_type": "differential_sharpe",
+    "train_sharpe": 4.519364833831787,
+    "val_sharpe": 2.2708916664123535,
+    "test_sharpe": 1.065184235572815,
+    "model_path": "../models/technical/differential_sharpe/differential_sharpe_technical_ppo.zip",
+    "gamma": 0.9,
+    "softmax_temperature": 1.0,
+    "transaction_cost": 0.0025
+  },
+  "best_sentiment": {
+    "agent_type": "sentiment",
+    "algorithm": "PPO",
+    "reward_type": "differential_sharpe",
+    "train_sharpe": 0.4347774088382721,
+    "val_sharpe": 2.2776007652282715,
+    "test_sharpe": 1.037638545036316,
+    "model_path": "../models/sentiment/differential_sharpe/differential_sharpe_sentiment_ppo.zip",
+    "gamma": 0.9,
+    "softmax_temperature": 1.0,
+    "transaction_cost": 0.0025
+  }
+}

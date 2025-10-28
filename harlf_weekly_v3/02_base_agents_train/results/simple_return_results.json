@@ -1,0 +1,103 @@
+{
+  "approach": "simple_return",
+  "technical_results": [
+    {
+      "agent_type": "technical",
+      "algorithm": "PPO",
+      "reward_type": "simple_return",
+      "train_sharpe": 0.5167081356048584,
+      "val_sharpe": 2.2566895484924316,
+      "test_sharpe": 1.063544750213623,
+      "model_path": "../models/technical/simple_return/simple_return_technical_ppo.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    },
+    {
+      "agent_type": "technical",
+      "algorithm": "SAC",
+      "reward_type": "simple_return",
+      "train_sharpe": 0.37177422642707825,
+      "val_sharpe": 2.26345157623291,
+      "test_sharpe": 1.0792514085769653,
+      "model_path": "../models/technical/simple_return/simple_return_technical_sac.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    },
+    {
+      "agent_type": "technical",
+      "algorithm": "A2C",
+      "reward_type": "simple_return",
+      "train_sharpe": 1.5193779468536377,
+      "val_sharpe": 2.5935444831848145,
+      "test_sharpe": 1.1285192966461182,
+      "model_path": "../models/technical/simple_return/simple_return_technical_a2c.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    }
+  ],
+  "sentiment_results": [
+    {
+      "agent_type": "sentiment",
+      "algorithm": "PPO",
+      "reward_type": "simple_return",
+      "train_sharpe": 1.029175043106079,
+      "val_sharpe": 2.2599966526031494,
+      "test_sharpe": 1.0456682443618774,
+      "model_path": "../models/sentiment/simple_return/simple_return_sentiment_ppo.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    },
+    {
+      "agent_type": "sentiment",
+      "algorithm": "SAC",
+      "reward_type": "simple_return",
+      "train_sharpe": 0.9009891152381897,
+      "val_sharpe": 2.271174669265747,
+      "test_sharpe": 1.048993706703186,
+      "model_path": "../models/sentiment/simple_return/simple_return_sentiment_sac.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    },
+    {
+      "agent_type": "sentiment",
+      "algorithm": "A2C",
+      "reward_type": "simple_return",
+      "train_sharpe": 2.4158806800842285,
+      "val_sharpe": 2.760248899459839,
+      "test_sharpe": 0.515936553478241,
+      "model_path": "../models/sentiment/simple_return/simple_return_sentiment_a2c.zip",
+      "gamma": 0.9,
+      "softmax_temperature": 1.0,
+      "transaction_cost": 0.0025
+    }
+  ],
+  "best_technical": {
+    "agent_type": "technical",
+    "algorithm": "A2C",
+    "reward_type": "simple_return",
+    "train_sharpe": 1.5193779468536377,
+    "val_sharpe": 2.5935444831848145,
+    "test_sharpe": 1.1285192966461182,
+    "model_path": "../models/technical/simple_return/simple_return_technical_a2c.zip",
+    "gamma": 0.9,
+    "softmax_temperature": 1.0,
+    "transaction_cost": 0.0025
+  },
+  "best_sentiment": {
+    "agent_type": "sentiment",
+    "algorithm": "SAC",
+    "reward_type": "simple_return",
+    "train_sharpe": 0.9009891152381897,
+    "val_sharpe": 2.271174669265747,
+    "test_sharpe": 1.048993706703186,
+    "model_path": "../models/sentiment/simple_return/simple_return_sentiment_sac.zip",
+    "gamma": 0.9,
+    "softmax_temperature": 1.0,
+    "transaction_cost": 0.0025
+  }
+}
