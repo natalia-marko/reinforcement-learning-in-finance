@@ -1,0 +1,122 @@
+{
+  "agent_type": "sentiment",
+  "agent_name": "sentiment_ema_sharpe",
+  "reward_type": "ema_sharpe",
+  "training_history": {
+    "agent_type": "sentiment",
+    "agent_name": "sentiment_ema_sharpe",
+    "reward_type": "ema_sharpe",
+    "training_time": 20.32148790359497,
+    "total_steps": 60000,
+    "best_reward": 20.92838870962333,
+    "early_stopped": true,
+    "evaluation_history": [
+      {
+        "step": 10000,
+        "mean_reward": 20.92838870962333,
+        "std_reward": 0.0,
+        "best_reward": 20.92838870962333,
+        "split": "val"
+      },
+      {
+        "step": 20000,
+        "mean_reward": 15.787851674582205,
+        "std_reward": 1.7763568394002505e-15,
+        "best_reward": 20.92838870962333,
+        "split": "val"
+      },
+      {
+        "step": 30000,
+        "mean_reward": 14.163142486307402,
+        "std_reward": 0.0,
+        "best_reward": 20.92838870962333,
+        "split": "val"
+      },
+      {
+        "step": 40000,
+        "mean_reward": 13.998689407791634,
+        "std_reward": 1.7763568394002505e-15,
+        "best_reward": 20.92838870962333,
+        "split": "val"
+      },
+      {
+        "step": 50000,
+        "mean_reward": 15.162004418623843,
+        "std_reward": 1.7763568394002505e-15,
+        "best_reward": 20.92838870962333,
+        "split": "val"
+      },
+      {
+        "step": 60000,
+        "mean_reward": 20.54808971956664,
+        "std_reward": 3.552713678800501e-15,
+        "best_reward": 20.92838870962333,
+        "split": "val"
+      }
+    ],
+    "config": {
+      "learning_rate": 0.0003,
+      "n_steps": 2048,
+      "batch_size": 64,
+      "n_epochs": 10,
+      "gamma": 0.99,
+      "gae_lambda": 0.95,
+      "clip_range": 0.2,
+      "ent_coef": 0.01,
+      "vf_coef": 0.5,
+      "max_grad_norm": 0.5,
+      "total_timesteps": 200000,
+      "net_arch": [
+        256,
+        256
+      ],
+      "activation": "tanh",
+      "eval_freq": 10000,
+      "n_eval_episodes": 10,
+      "patience": 5,
+      "min_delta": 0.01
+    }
+  },
+  "performance": {
+    "train": {
+      "total_return": 30.095352246617704,
+      "annual_return": 1.0536067297725138,
+      "annual_volatility": 0.3734488792045496,
+      "sharpe_ratio": 2.7141779938702917,
+      "sortino_ratio": 5.414126048088388,
+      "max_drawdown": -0.2812347819713505,
+      "calmar_ratio": 3.746359971505392,
+      "win_rate": 0.6666666666666666,
+      "n_periods": 183,
+      "final_value": 3109535.2246617707,
+      "initial_value": 100000
+    },
+    "val": {
+      "total_return": 0.3447123844932407,
+      "annual_return": 0.29444440338923894,
+      "annual_volatility": 0.28877982886447695,
+      "sharpe_ratio": 0.8811017181835384,
+      "sortino_ratio": 1.5816584356906498,
+      "max_drawdown": -0.18837646056854987,
+      "calmar_ratio": 1.5630636784477174,
+      "win_rate": 0.5573770491803278,
+      "n_periods": 61,
+      "final_value": 134471.2384493241,
+      "initial_value": 100000
+    },
+    "test": {
+      "total_return": -0.1559651444654484,
+      "annual_return": -0.24315601864430864,
+      "annual_volatility": 0.2858143754532235,
+      "sharpe_ratio": -0.9906990094368088,
+      "sortino_ratio": -1.5681306071511836,
+      "max_drawdown": -0.314037230448221,
+      "calmar_ratio": -0.7742904186782421,
+      "win_rate": 0.3870967741935484,
+      "n_periods": 31,
+      "final_value": 84403.48555345516,
+      "initial_value": 100000
+    }
+  },
+  "saved_at": "2025-11-05T10:45:54.711730"
+}
