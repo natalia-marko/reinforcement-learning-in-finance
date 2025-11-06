@@ -16,13 +16,14 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Callable
 import time
 import torch
+import torch.nn as nn
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 from .environments import create_env
-from .config import BaseAgentConfig, AGENT_MODELS_DIR
+from .config import BaseAgentConfig, AGENT_MODELS_DIR, ACTIVATION_FUNCTIONS
 from .utils import calculate_all_metrics, print_metrics
 
 # ============================================================================
@@ -82,17 +83,22 @@ class EvaluationCallback(BaseCallback):
         """
         # Only evaluate at the correct schedule (avoid step 0 which can occur in some SB3 versions)
         if self.eval_freq > 0 and self.n_calls > 0 and self.n_calls % self.eval_freq == 0:
-            mean_reward, std_reward = self._evaluate()
+            eval_results = self._evaluate()  # Now returns dict
 
             # Avoid duplicated output if called very rapidly/recursively due to some SB3 callback bugs
             if hasattr(self, '_last_eval_call') and self._last_eval_call == self.n_calls:
                 return True
             self._last_eval_call = self.n_calls
 
-            # Only print ONCE per evaluation, regardless of any other printing mechanics
+            mean_reward = eval_results['mean_reward']
+            std_reward = eval_results['std_reward']
+
+            # Print evaluation
             if self.verbose > 0:
                 print(f"\n--- Evaluation at step {self.n_calls} ---")
                 print(f"  Mean reward: {mean_reward:.4f} ± {std_reward:.4f}")
+                if 'sharpe' in eval_results:
+                    print(f"  Sharpe: {eval_results['sharpe']:.3f}")
 
             # Check for improvement
             if mean_reward > self.best_mean_reward + self.min_delta:
@@ -109,17 +115,15 @@ class EvaluationCallback(BaseCallback):
                         print(f"  💾 Model saved to {self.save_path}")
             else:
                 self.evaluations_since_best += 1
-
                 if self.verbose > 0:
                     print(f"  No improvement ({self.evaluations_since_best}/{self.patience})")
 
-            # Store history
+            # Store history with all metrics
             self.evaluation_history.append({
                 'step': self.n_calls,
-                'mean_reward': mean_reward,
-                'std_reward': std_reward,
                 'best_reward': self.best_mean_reward,
-                'split': 'val'
+                'split': 'val',
+                **eval_results  # Include all metrics from evaluation
             })
 
             # Early stopping check
@@ -131,32 +135,62 @@ class EvaluationCallback(BaseCallback):
 
         return True
 
-    def _evaluate(self) -> Tuple[float, float]:
+    def _evaluate(self) -> Dict:
         """
-        Evaluate agent on validation set.
+        Evaluate agent on validation set and calculate comprehensive metrics.
 
         Returns:
-            Tuple of (mean_reward, std_reward)
+            Dictionary with mean_reward, std_reward, and portfolio metrics
         """
         episode_rewards = []
+        all_returns = []
 
         for _ in range(self.n_eval_episodes):
             obs, _ = self.eval_env.reset()
             done = False
             episode_reward = 0
+            episode_returns = []
 
             while not done:
                 action, _ = self.model.predict(obs, deterministic=True)
-                obs, reward, terminated, truncated, _ = self.eval_env.step(action)
+                obs, reward, terminated, truncated, info = self.eval_env.step(action)
                 episode_reward += reward
                 done = terminated or truncated
 
+                # Collect per-step returns if available in info
+                if 'return' in info:
+                    episode_returns.append(info['return'])
+
             episode_rewards.append(episode_reward)
+
+            # If returns not in info, try to get from environment attribute
+            if not episode_returns and hasattr(self.eval_env, 'episode_returns'):
+                episode_returns = self.eval_env.episode_returns
+
+            all_returns.extend(episode_returns)
 
         mean_reward = np.mean(episode_rewards)
         std_reward = np.std(episode_rewards)
 
-        return mean_reward, std_reward
+        # Calculate portfolio metrics if we have returns
+        metrics = {}
+        if all_returns:
+            returns_array = np.array(all_returns)
+            portfolio_metrics = calculate_all_metrics(returns_array)
+            metrics = {
+                'sharpe': float(portfolio_metrics.get('sharpe_ratio', 0.0)),  # ← Fixed: was 'sharpe', should be 'sharpe_ratio'
+                'annual_return': float(portfolio_metrics.get('annual_return', 0.0)),
+                'annual_volatility': float(portfolio_metrics.get('annual_volatility', 0.0)),
+                'max_drawdown': float(portfolio_metrics.get('max_drawdown', 0.0)),
+                'calmar': float(portfolio_metrics.get('calmar_ratio', 0.0)),  # ← Fixed: was 'calmar', should be 'calmar_ratio'
+                'win_rate': float(portfolio_metrics.get('win_rate', 0.0))
+            }
+
+        return {
+            'mean_reward': mean_reward,
+            'std_reward': std_reward,
+            **metrics
+        }
 
 # ============================================================================
 # TRAINING FUNCTIONS
@@ -237,7 +271,7 @@ def train_base_agent(
         max_grad_norm=config.MAX_GRAD_NORM,
         policy_kwargs={
             'net_arch': config.NET_ARCH,
-            'activation_fn': eval(f'torch.nn.{config.ACTIVATION.capitalize()}')
+            'activation_fn': ACTIVATION_FUNCTIONS.get(config.ACTIVATION, nn.Tanh)
         },
         verbose=0
     )
@@ -340,24 +374,19 @@ def evaluate_agent(
     for episode in range(n_episodes):
         obs, _ = env.reset()
         done = False
-        episode_returns = []
         episode_actions = []
         episode_values = []
 
         while not done:
             # Get action
             action, _ = model.predict(obs, deterministic=True)
-
             # Store action
             episode_actions.append(action.copy())
-
             # Take step
             obs, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
-
             # Store info
             episode_values.append(info['portfolio_value'])
-
         # Store episode data
         episode_returns = env.episode_returns
         all_returns.extend(episode_returns)
@@ -574,16 +603,17 @@ def train_super_agent(
             print(f"   Early stopped at step {callback.n_calls}")
         print(f"   Best mean reward: {callback.best_mean_reward:.4f}")
 
-    # Prepare history
+    # Prepare history - metrics now properly calculated by EvaluationCallback
+    # Note: train evaluation not implemented yet, so train metrics will be empty
     history = {
-        'train_rewards': [eval_data['mean_reward'] for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'train'],
-        'val_rewards': [eval_data['mean_reward'] for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'val'],
-        'train_sharpe': [eval_data.get('sharpe', 0) for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'train'],
-        'val_sharpe': [eval_data.get('sharpe', 0) for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'val'],
-        'train_returns': [eval_data.get('annual_return', 0) for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'train'],
-        'val_returns': [eval_data.get('annual_return', 0) for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'val'],
-        'train_drawdown': [eval_data.get('max_drawdown', 0) for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'train'],
-        'val_drawdown': [eval_data.get('max_drawdown', 0) for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'val'],
+        'train_rewards': [],  # Not tracked (callback only evaluates on val_env)
+        'val_rewards': [eval_data['mean_reward'] for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'train_sharpe': [],  # Not tracked
+        'val_sharpe': [eval_data.get('sharpe', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'train_returns': [],  # Not tracked
+        'val_returns': [eval_data.get('annual_return', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'train_drawdown': [],  # Not tracked
+        'val_drawdown': [eval_data.get('max_drawdown', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
         'best_reward': callback.best_mean_reward,
         'early_stopped': callback.early_stopped,
         'training_time': training_time
@@ -601,13 +631,6 @@ def evaluate_super_agent(
     """
     Evaluate Super Agent on given environment.
 
-    Args:
-        model: Trained PPO model
-        env: Environment to evaluate on
-        split: Split name for logging
-        n_episodes: Number of episodes
-        deterministic: Use deterministic actions
-
     Returns:
         Dictionary with evaluation results
     """
@@ -616,32 +639,33 @@ def evaluate_super_agent(
     for episode in range(n_episodes):
         obs, _ = env.reset()
         done = False
-        episode_returns = []
 
         while not done:
             action, _ = model.predict(obs, deterministic=deterministic)
-            obs, reward, done, truncated, info = env.step(action)
-            done = done or truncated
-            if 'return' in info:
-                episode_returns.append(info['return'])
+            obs, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
 
+        # After episode, collect all episode returns (from env.episode_returns attribute)
+        episode_returns = env.episode_returns
         all_returns.extend(episode_returns)
 
-    # Calculate metrics
-    all_returns = np.array(all_returns)
-    metrics = calculate_all_metrics(all_returns)
+    # Calculate metrics using all episode returns
+    returns_array = np.array(all_returns)
+    metrics = calculate_all_metrics(returns_array)
 
+    # Normalize field names to match notebook expectations
     results = {
-        'split': split,
-        'returns': all_returns.tolist(),
-        'sharpe': metrics['sharpe_ratio'],
-        'annual_return': metrics['annual_return'],
-        'annual_volatility': metrics['annual_volatility'],
-        'max_drawdown': metrics['max_drawdown'],
-        'calmar': metrics['calmar_ratio'],
-        'win_rate': metrics['win_rate']
+        'sharpe': float(metrics.get('sharpe_ratio', 0.0)),
+        'annual_return': float(metrics.get('annual_return', 0.0)),
+        'annual_volatility': float(metrics.get('annual_volatility', 0.0)),
+        'max_drawdown': float(metrics.get('max_drawdown', 0.0)),
+        'calmar': float(metrics.get('calmar_ratio', 0.0)),
+        'sortino': float(metrics.get('sortino_ratio', 0.0)),
+        'win_rate': float(metrics.get('win_rate', 0.0)),
+        'total_return': float(metrics.get('total_return', 0.0)),
+        'returns': returns_array.tolist(),
+        'split': split
     }
-
     return results
 
 def train_meta_agent(
@@ -722,16 +746,17 @@ def train_meta_agent(
             print(f"   Early stopped at step {callback.n_calls}")
         print(f"   Best mean reward: {callback.best_mean_reward:.4f}")
 
-    # Prepare history
+    # Prepare history - metrics now properly calculated by EvaluationCallback
+    # Note: train evaluation not implemented yet, so train metrics will be empty
     history = {
-        'train_rewards': [eval_data['mean_reward'] for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'train'],
-        'val_rewards': [eval_data['mean_reward'] for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'val'],
-        'train_sharpe': [eval_data.get('sharpe', 0) for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'train'],
-        'val_sharpe': [eval_data.get('sharpe', 0) for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'val'],
-        'train_returns': [eval_data.get('annual_return', 0) for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'train'],
-        'val_returns': [eval_data.get('annual_return', 0) for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'val'],
-        'train_drawdown': [eval_data.get('max_drawdown', 0) for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'train'],
-        'val_drawdown': [eval_data.get('max_drawdown', 0) for eval_data in callback.evaluation_history if eval_data.get('split', '') == 'val'],
+        'train_rewards': [],  # Not tracked (callback only evaluates on val_env)
+        'val_rewards': [eval_data['mean_reward'] for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'train_sharpe': [],  # Not tracked
+        'val_sharpe': [eval_data.get('sharpe', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'train_returns': [],  # Not tracked
+        'val_returns': [eval_data.get('annual_return', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'train_drawdown': [],  # Not tracked
+        'val_drawdown': [eval_data.get('max_drawdown', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
         'best_reward': callback.best_mean_reward,
         'early_stopped': callback.early_stopped,
         'training_time': training_time
@@ -749,13 +774,6 @@ def evaluate_meta_agent(
     """
     Evaluate Meta Agent on given environment.
 
-    Args:
-        model: Trained PPO model
-        env: Environment to evaluate on
-        split: Split name for logging
-        n_episodes: Number of episodes
-        deterministic: Use deterministic actions
-
     Returns:
         Dictionary with evaluation results
     """
@@ -764,30 +782,32 @@ def evaluate_meta_agent(
     for episode in range(n_episodes):
         obs, _ = env.reset()
         done = False
-        episode_returns = []
 
         while not done:
             action, _ = model.predict(obs, deterministic=deterministic)
-            obs, reward, done, truncated, info = env.step(action)
-            done = done or truncated
-            if 'return' in info:
-                episode_returns.append(info['return'])
+            obs, reward, terminated, truncated, info = env.step(action)
+            done = terminated or truncated
 
+        # After episode, collect episode returns
+        episode_returns = env.episode_returns
         all_returns.extend(episode_returns)
 
     # Calculate metrics
-    all_returns = np.array(all_returns)
-    metrics = calculate_all_metrics(all_returns)
+    returns_array = np.array(all_returns)
+    metrics = calculate_all_metrics(returns_array)
 
+    # Normalize field names to match notebook expectations
     results = {
-        'split': split,
-        'returns': all_returns.tolist(),
-        'sharpe': metrics['sharpe_ratio'],
-        'annual_return': metrics['annual_return'],
-        'annual_volatility': metrics['annual_volatility'],
-        'max_drawdown': metrics['max_drawdown'],
-        'calmar': metrics['calmar_ratio'],
-        'win_rate': metrics['win_rate']
+        'sharpe': float(metrics.get('sharpe_ratio', 0.0)),
+        'annual_return': float(metrics.get('annual_return', 0.0)),
+        'annual_volatility': float(metrics.get('annual_volatility', 0.0)),
+        'max_drawdown': float(metrics.get('max_drawdown', 0.0)),
+        'calmar': float(metrics.get('calmar_ratio', 0.0)),
+        'sortino': float(metrics.get('sortino_ratio', 0.0)),
+        'win_rate': float(metrics.get('win_rate', 0.0)),
+        'total_return': float(metrics.get('total_return', 0.0)),
+        'returns': returns_array.tolist(),
+        'split': split
     }
 
     return results

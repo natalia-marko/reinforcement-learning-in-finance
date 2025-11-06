@@ -365,7 +365,7 @@ def calculate_all_metrics(
 def save_agent_results(
     agent_name: str,
     results: Dict,
-    models_dir: Optional[Path] = None
+    results_dir: Optional[Path] = None
 ):
     """
     Save agent results to JSON file.
@@ -375,15 +375,15 @@ def save_agent_results(
         results: Dictionary of results to save
         models_dir: Models directory (default: from config)
     """
-    if models_dir is None:
-        from .config import MODELS_DIR
-        models_dir = MODELS_DIR
+    if results_dir is None:
+        from .config import RESULTS_DIR
+        results_dir = RESULTS_DIR
 
     # Add timestamp
     results['saved_at'] = datetime.now().isoformat()
 
     # Save to JSON
-    file_path = models_dir / f'{agent_name}_results.json'
+    file_path = results_dir / f'{agent_name}_results.json'
     with open(file_path, 'w') as f:
         json.dump(results, f, indent=2)
 
@@ -392,7 +392,7 @@ def save_agent_results(
 
 def load_agent_results(
     agent_name: str,
-    models_dir: Optional[Path] = None
+    results_dir: Optional[Path] = None
 ) -> Dict:
     """
     Load agent results from JSON file.
@@ -404,11 +404,11 @@ def load_agent_results(
     Returns:
         Dictionary of results
     """
-    if models_dir is None:
-        from .config import MODELS_DIR
-        models_dir = MODELS_DIR
+    if results_dir is None:
+        from .config import RESULTS_DIR
+        results_dir = RESULTS_DIR
 
-    file_path = models_dir / f'{agent_name}_results.json'
+    file_path = results_dir / f'{agent_name}_results.json'
 
     if not file_path.exists():
         raise FileNotFoundError(f"Results file not found: {file_path}")

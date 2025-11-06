@@ -65,10 +65,15 @@ class BaseAgentWrapper:
         self.n_steps = self.features.shape[0]
 
         self.current_step = 0
+        # Start with zero positions (100% cash) - agent learns to build portfolio from scratch
+        # This is intentional and allows the agent to learn optimal entry points
+        self.positions = np.zeros(N_ASSETS)
 
     def reset(self):
         """Reset to beginning of episode."""
         self.current_step = 0
+        # Reset to zero positions (100% cash) - starting state for each episode
+        self.positions = np.zeros(N_ASSETS)
 
     def get_action(self, step: Optional[int] = None) -> np.ndarray:
         """
@@ -86,8 +91,10 @@ class BaseAgentWrapper:
         if step >= self.n_steps:
             raise ValueError(f"Step {step} exceeds data length {self.n_steps}")
 
-        # Get observation (flatten features for this step)
-        obs = self.features[step].flatten().astype(np.float32)
+        # Get observation: features + current positions
+        # Base agents expect: [flattened_features, positions]
+        features_flat = self.features[step].flatten().astype(np.float32)
+        obs = np.concatenate([features_flat, self.positions]).astype(np.float32)
 
         # Get action from model
         action, _ = self.model.predict(obs, deterministic=True)
@@ -98,6 +105,9 @@ class BaseAgentWrapper:
         else:
             action = np.ones(N_ASSETS) / N_ASSETS
 
+        # Update positions for next call
+        self.positions = action.copy()
+        
         return action
 
     def step(self) -> np.ndarray:
@@ -285,6 +295,17 @@ class SuperAgentEnv(gym.Env):
         info = self._get_info()
 
         return obs, reward, terminated, truncated, info
+
+    def advance_step(self):
+        """
+        Advance step counters for all nested components.
+
+        This method ensures proper synchronization of step counters
+        across the SuperAgentEnv and its nested base agents.
+        """
+        self.current_step += 1
+        self.technical_agent.current_step += 1
+        self.sentiment_agent.current_step += 1
 
     def _get_observation(self) -> np.ndarray:
         """Get current observation."""
@@ -482,9 +503,7 @@ class MetaAgentEnv(gym.Env):
 
         # Advance steps (both meta and super env)
         self.current_step += 1
-        self.super_env.current_step += 1
-        self.super_env.technical_agent.current_step += 1
-        self.super_env.sentiment_agent.current_step += 1
+        self.super_env.advance_step()  # Encapsulated state synchronization
 
         # Check termination
         terminated = False
@@ -504,15 +523,30 @@ class MetaAgentEnv(gym.Env):
         if self.current_step >= self.n_steps:
             return np.zeros(self.observation_space.shape[0], dtype=np.float32)
 
-        # Get super agent action
+        # Get super agent's blended portfolio output (not the blending weights!)
+        # The super agent takes blend weights as action and outputs blended portfolio
         super_obs = self.super_env._get_observation()
-        super_action, _ = self.super_agent.predict(super_obs, deterministic=True)
+        blend_weights, _ = self.super_agent.predict(super_obs, deterministic=True)
 
-        # Normalize
-        if super_action.sum() > 0:
-            super_action = super_action / super_action.sum()
+        # Normalize blend weights
+        blend_weights = np.clip(blend_weights, 0, 1)
+        if blend_weights.sum() > 0:
+            blend_weights = blend_weights / blend_weights.sum()
         else:
-            super_action = np.ones(self.n_assets) / self.n_assets
+            blend_weights = np.array([0.5, 0.5])
+
+        # Get base agent actions
+        tech_action = self.super_env.technical_agent.get_action(self.current_step)
+        sent_action = self.super_env.sentiment_agent.get_action(self.current_step)
+
+        # Blend to get portfolio
+        blended_portfolio = blend_weights[0] * tech_action + blend_weights[1] * sent_action
+
+        # Normalize portfolio
+        if blended_portfolio.sum() > 0:
+            blended_portfolio = blended_portfolio / blended_portfolio.sum()
+        else:
+            blended_portfolio = np.ones(self.n_assets) / self.n_assets
 
         # Get macro features for current step
         if len(self.macro_features.shape) == 3:
@@ -522,8 +556,8 @@ class MetaAgentEnv(gym.Env):
             # (n_steps, n_features)
             macro_feat = self.macro_features[self.current_step]
 
-        # Concatenate
-        obs = np.concatenate([super_action, macro_feat])
+        # Concatenate: blended portfolio (n_assets) + macro features
+        obs = np.concatenate([blended_portfolio, macro_feat])
 
         return obs.astype(np.float32)
 

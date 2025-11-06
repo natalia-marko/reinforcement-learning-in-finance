@@ -10,6 +10,19 @@ This module contains all configuration parameters for:
 """
 
 from pathlib import Path
+import torch.nn as nn
+
+# ============================================================================
+# ACTIVATION FUNCTIONS
+# ============================================================================
+
+ACTIVATION_FUNCTIONS = {
+    'tanh': nn.Tanh,
+    'relu': nn.ReLU,
+    'elu': nn.ELU,
+    'leaky_relu': nn.LeakyReLU,
+    'sigmoid': nn.Sigmoid
+}
 
 # ============================================================================
 # PROJECT PATHS
@@ -18,10 +31,12 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 DATA_DIR = PROJECT_ROOT / 'data_hierarchical'
 MODELS_DIR = PROJECT_ROOT / 'models'
+RESULTS_DIR = MODELS_DIR / 'results'
 AGENT_MODELS_DIR = MODELS_DIR / 'agent_models'
 
 # Create directories if they don't exist
 MODELS_DIR.mkdir(exist_ok=True)
+RESULTS_DIR.mkdir(exist_ok=True)
 AGENT_MODELS_DIR.mkdir(exist_ok=True)
 
 # ============================================================================
@@ -368,6 +383,24 @@ class AgentFeatures:
             return cls.MACRO
         else:
             raise ValueError(f"Unknown agent type: {agent_type}")
+
+    @classmethod
+    def to_dict(cls):
+        """Convert feature specifications to dictionary."""
+        return {
+            'technical': {
+                'count': len(cls.TECHNICAL),
+                'features': cls.TECHNICAL
+            },
+            'sentiment': {
+                'count': len(cls.SENTIMENT),
+                'features': cls.SENTIMENT
+            },
+            'macro': {
+                'count': len(cls.MACRO),
+                'features': cls.MACRO
+            }
+        }
 
 
 # ============================================================================

@@ -26,11 +26,13 @@ from .config import (
     SuperAgentConfig,
     MetaAgentConfig,
     AgentFeatures,
+    ACTIVATION_FUNCTIONS,
     TICKERS,
     N_ASSETS,
     DATA_DIR,
     MODELS_DIR,
-    AGENT_MODELS_DIR
+    AGENT_MODELS_DIR,
+    RESULTS_DIR
 )
 
 from .rewards import (
@@ -96,11 +98,13 @@ __all__ = [
     'SuperAgentConfig',
     'MetaAgentConfig',
     'AgentFeatures',
+    'ACTIVATION_FUNCTIONS',
     'TICKERS',
     'N_ASSETS',
     'DATA_DIR',
     'MODELS_DIR',
     'AGENT_MODELS_DIR',
+    'RESULTS_DIR',
     # Rewards
     'EMASharpeReward',
     'MultiObjectiveReward',

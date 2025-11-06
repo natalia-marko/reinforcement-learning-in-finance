@@ -43,9 +43,9 @@ MACRO_TICKERS = {
     'vix': '^VIX',
 }
 
-TRAIN_RATIO = 0.6
+TRAIN_RATIO = 0.7
 VAL_RATIO = 0.2
-TEST_RATIO = 0.2
+TEST_RATIO = 0.1
 
 DATA_DIR = Path('data_hierarchical')
 DATA_DIR.mkdir(exist_ok=True)
@@ -325,22 +325,30 @@ treasury_10y_data = yf.download('^TNX', start=START_DATE, end=END_DATE, progress
 treasury_2y_data = yf.download('^IRX', start=START_DATE, end=END_DATE, progress=False)
 
 # Extract Close column (handle both Series and DataFrame)
-vix_close = vix_data['Close'] if 'Close' in vix_data.columns else vix_data.iloc[:, 0]
-treasury_10y_close = treasury_10y_data['Close'] if 'Close' in treasury_10y_data.columns else treasury_10y_data.iloc[:, 0]
-treasury_2y_close = treasury_2y_data['Close'] if 'Close' in treasury_2y_data.columns else treasury_2y_data.iloc[:, 0]
+if isinstance(vix_data, pd.DataFrame):
+    vix_close = vix_data['Close'] if 'Close' in vix_data.columns else vix_data.iloc[:, 0]
+else:
+    vix_close = vix_data
 
-vix_weekly = vix_close.resample('W-FRI').last().ffill()
-treasury_10y_weekly = treasury_10y_close.resample('W-FRI').last().ffill()
-treasury_2y_weekly = treasury_2y_close.resample('W-FRI').last().ffill()
+if isinstance(treasury_10y_data, pd.DataFrame):
+    treasury_10y_close = treasury_10y_data['Close'] if 'Close' in treasury_10y_data.columns else treasury_10y_data.iloc[:, 0]
+else:
+    treasury_10y_close = treasury_10y_data
 
-# Ensure Series (squeeze if DataFrame)
-vix_weekly = vix_weekly.squeeze() if hasattr(vix_weekly, 'squeeze') else vix_weekly
-treasury_10y_weekly = treasury_10y_weekly.squeeze() if hasattr(treasury_10y_weekly, 'squeeze') else treasury_10y_weekly
-treasury_2y_weekly = treasury_2y_weekly.squeeze() if hasattr(treasury_2y_weekly, 'squeeze') else treasury_2y_weekly
+if isinstance(treasury_2y_data, pd.DataFrame):
+    treasury_2y_close = treasury_2y_data['Close'] if 'Close' in treasury_2y_data.columns else treasury_2y_data.iloc[:, 0]
+else:
+    treasury_2y_close = treasury_2y_data
 
-vix_aligned = vix_weekly.reindex(common_dates).ffill()
-treasury_10y_aligned = treasury_10y_weekly.reindex(common_dates).ffill()
-treasury_2y_aligned = treasury_2y_weekly.reindex(common_dates).ffill()
+# Resample to weekly and ensure Series
+vix_weekly = vix_close.resample('W-FRI').last().ffill().squeeze()
+treasury_10y_weekly = treasury_10y_close.resample('W-FRI').last().ffill().squeeze()
+treasury_2y_weekly = treasury_2y_close.resample('W-FRI').last().ffill().squeeze()
+
+# Align to common dates and ensure Series
+vix_aligned = vix_weekly.reindex(common_dates).ffill().squeeze()
+treasury_10y_aligned = treasury_10y_weekly.reindex(common_dates).ffill().squeeze()
+treasury_2y_aligned = treasury_2y_weekly.reindex(common_dates).ffill().squeeze()
 
 print(f"  ✅ VIX: {len(vix_aligned)} weeks")
 print(f"  ✅ 10Y Treasury: {len(treasury_10y_aligned)} weeks")
@@ -350,18 +358,26 @@ def calculate_macro_features(dates, vix, treasury_10y, treasury_2y):
     """Calculate 12 macro features (shared across portfolio)."""
     features = pd.DataFrame(index=dates)
 
+    # Ensure inputs are Series (not DataFrame)
+    if isinstance(vix, pd.DataFrame):
+        vix = vix.iloc[:, 0]
+    if isinstance(treasury_10y, pd.DataFrame):
+        treasury_10y = treasury_10y.iloc[:, 0]
+    if isinstance(treasury_2y, pd.DataFrame):
+        treasury_2y = treasury_2y.iloc[:, 0]
+
     # === INTEREST RATE ENVIRONMENT (4 features) ===
-    features['treasury_10y'] = treasury_10y
-    features['fed_funds_rate'] = treasury_2y
-    features['yield_curve_2_10'] = treasury_10y - treasury_2y
-    features['real_yield_10y'] = treasury_10y - 2.0
+    features['treasury_10y'] = treasury_10y.values
+    features['fed_funds_rate'] = treasury_2y.values
+    features['yield_curve_2_10'] = (treasury_10y - treasury_2y).values
+    features['real_yield_10y'] = (treasury_10y - 2.0).values
 
     # === MARKET VOLATILITY & RISK (2 features) ===
-    features['vix'] = vix
-    features['vix_regime'] = vix.rolling(52).rank(pct=True)
+    features['vix'] = vix.values
+    features['vix_regime'] = vix.rolling(52).rank(pct=True).values
 
     # === ECONOMIC HEALTH (2 features) ===
-    features['credit_spread'] = (vix - vix.rolling(52).mean()) / vix.rolling(52).std()
+    features['credit_spread'] = ((vix - vix.rolling(52).mean()) / vix.rolling(52).std()).values
     features['unemployment_rate'] = 4.0  # Placeholder
 
     # === CALENDAR EFFECTS (4 features) ===
