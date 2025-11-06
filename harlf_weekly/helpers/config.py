@@ -31,13 +31,9 @@ ACTIVATION_FUNCTIONS = {
 PROJECT_ROOT = Path(__file__).parent.parent
 DATA_DIR = PROJECT_ROOT / 'data_hierarchical'
 MODELS_DIR = PROJECT_ROOT / 'models'
-RESULTS_DIR = MODELS_DIR / 'results'
-AGENT_MODELS_DIR = MODELS_DIR / 'agent_models'
 
 # Create directories if they don't exist
 MODELS_DIR.mkdir(exist_ok=True)
-RESULTS_DIR.mkdir(exist_ok=True)
-AGENT_MODELS_DIR.mkdir(exist_ok=True)
 
 # ============================================================================
 # PORTFOLIO CONFIGURATION
@@ -206,14 +202,14 @@ class SuperAgentConfig:
     """Configuration for super agent training (blends base agents)."""
 
     # PPO Hyperparameters (similar to base but potentially different)
-    LEARNING_RATE = 1e-4      # Lower LR for meta-learning
+    LEARNING_RATE = 3e-4      # Lower LR for meta-learning
     N_STEPS = 1024
     BATCH_SIZE = 64
     N_EPOCHS = 10
     GAMMA = 0.99
     GAE_LAMBDA = 0.95
     CLIP_RANGE = 0.2
-    ENT_COEF = 0.005          # Lower entropy for more stable meta-policy
+    ENT_COEF = 0.02          # Lower entropy for more stable meta-policy
     VF_COEF = 0.5
     MAX_GRAD_NORM = 0.5
 
@@ -221,7 +217,7 @@ class SuperAgentConfig:
     TOTAL_TIMESTEPS = 100000  # Fewer steps (learns faster)
 
     # Network architecture
-    NET_ARCH = [128, 128]     # Smaller network
+    NET_ARCH = [64, 64]     # Smaller network
     ACTIVATION = 'tanh'
 
     # Evaluation
@@ -229,8 +225,8 @@ class SuperAgentConfig:
     N_EVAL_EPISODES = 10
 
     # Early stopping
-    PATIENCE = 5
-    MIN_DELTA = 0.01
+    PATIENCE = 10
+    MIN_DELTA = 0.05
 
     @classmethod
     def to_dict(cls):

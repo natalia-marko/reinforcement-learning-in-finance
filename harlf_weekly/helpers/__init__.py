@@ -30,9 +30,7 @@ from .config import (
     TICKERS,
     N_ASSETS,
     DATA_DIR,
-    MODELS_DIR,
-    AGENT_MODELS_DIR,
-    RESULTS_DIR
+    MODELS_DIR
 )
 
 from .rewards import (
@@ -61,6 +59,7 @@ from .utils import (
     calculate_all_metrics,
     save_agent_results,
     load_agent_results,
+    compile_base_agent_results,
     print_metrics,
     plot_equity_curve,
     plot_drawdown,
@@ -103,8 +102,6 @@ __all__ = [
     'N_ASSETS',
     'DATA_DIR',
     'MODELS_DIR',
-    'AGENT_MODELS_DIR',
-    'RESULTS_DIR',
     # Rewards
     'EMASharpeReward',
     'MultiObjectiveReward',
@@ -127,6 +124,7 @@ __all__ = [
     'calculate_all_metrics',
     'save_agent_results',
     'load_agent_results',
+    'compile_base_agent_results',
     'print_metrics',
     'plot_equity_curve',
     'plot_drawdown',

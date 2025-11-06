@@ -23,7 +23,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 
 from .environments import create_env
-from .config import BaseAgentConfig, AGENT_MODELS_DIR, ACTIVATION_FUNCTIONS
+from .config import BaseAgentConfig, MODELS_DIR, ACTIVATION_FUNCTIONS
 from .utils import calculate_all_metrics, print_metrics
 
 # ============================================================================
@@ -178,12 +178,12 @@ class EvaluationCallback(BaseCallback):
             returns_array = np.array(all_returns)
             portfolio_metrics = calculate_all_metrics(returns_array)
             metrics = {
-                'sharpe': float(portfolio_metrics.get('sharpe_ratio', 0.0)),  # ← Fixed: was 'sharpe', should be 'sharpe_ratio'
-                'annual_return': float(portfolio_metrics.get('annual_return', 0.0)),
-                'annual_volatility': float(portfolio_metrics.get('annual_volatility', 0.0)),
-                'max_drawdown': float(portfolio_metrics.get('max_drawdown', 0.0)),
-                'calmar': float(portfolio_metrics.get('calmar_ratio', 0.0)),  # ← Fixed: was 'calmar', should be 'calmar_ratio'
-                'win_rate': float(portfolio_metrics.get('win_rate', 0.0))
+                'sharpe': float(portfolio_metrics['sharpe']),
+                'annual_return': float(portfolio_metrics['annual_return']),
+                'annual_volatility': float(portfolio_metrics['annual_volatility']),
+                'max_drawdown': float(portfolio_metrics['max_drawdown']),
+                'calmar': float(portfolio_metrics['calmar']),
+                'win_rate': float(portfolio_metrics['win_rate'])
             }
 
         return {
@@ -281,7 +281,7 @@ def train_base_agent(
         print(f"   Learning rate: {config.LEARNING_RATE}")
 
     # Create callback
-    save_path = AGENT_MODELS_DIR / f'{agent_name}.zip' if save_model else None
+    save_path = MODELS_DIR / f'{agent_name}.zip' if save_model else None
 
     eval_callback = EvaluationCallback(
         eval_env=val_env,
@@ -653,16 +653,16 @@ def evaluate_super_agent(
     returns_array = np.array(all_returns)
     metrics = calculate_all_metrics(returns_array)
 
-    # Normalize field names to match notebook expectations
+    # Package results
     results = {
-        'sharpe': float(metrics.get('sharpe_ratio', 0.0)),
-        'annual_return': float(metrics.get('annual_return', 0.0)),
-        'annual_volatility': float(metrics.get('annual_volatility', 0.0)),
-        'max_drawdown': float(metrics.get('max_drawdown', 0.0)),
-        'calmar': float(metrics.get('calmar_ratio', 0.0)),
-        'sortino': float(metrics.get('sortino_ratio', 0.0)),
-        'win_rate': float(metrics.get('win_rate', 0.0)),
-        'total_return': float(metrics.get('total_return', 0.0)),
+        'sharpe': float(metrics['sharpe']),
+        'annual_return': float(metrics['annual_return']),
+        'annual_volatility': float(metrics['annual_volatility']),
+        'max_drawdown': float(metrics['max_drawdown']),
+        'calmar': float(metrics['calmar']),
+        'sortino': float(metrics['sortino']),
+        'win_rate': float(metrics['win_rate']),
+        'total_return': float(metrics['total_return']),
         'returns': returns_array.tolist(),
         'split': split
     }
@@ -796,16 +796,16 @@ def evaluate_meta_agent(
     returns_array = np.array(all_returns)
     metrics = calculate_all_metrics(returns_array)
 
-    # Normalize field names to match notebook expectations
+    # Package results
     results = {
-        'sharpe': float(metrics.get('sharpe_ratio', 0.0)),
-        'annual_return': float(metrics.get('annual_return', 0.0)),
-        'annual_volatility': float(metrics.get('annual_volatility', 0.0)),
-        'max_drawdown': float(metrics.get('max_drawdown', 0.0)),
-        'calmar': float(metrics.get('calmar_ratio', 0.0)),
-        'sortino': float(metrics.get('sortino_ratio', 0.0)),
-        'win_rate': float(metrics.get('win_rate', 0.0)),
-        'total_return': float(metrics.get('total_return', 0.0)),
+        'sharpe': float(metrics['sharpe']),
+        'annual_return': float(metrics['annual_return']),
+        'annual_volatility': float(metrics['annual_volatility']),
+        'max_drawdown': float(metrics['max_drawdown']),
+        'calmar': float(metrics['calmar']),
+        'sortino': float(metrics['sortino']),
+        'win_rate': float(metrics['win_rate']),
+        'total_return': float(metrics['total_return']),
         'returns': returns_array.tolist(),
         'split': split
     }

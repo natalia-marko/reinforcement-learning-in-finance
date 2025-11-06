@@ -331,10 +331,10 @@ def calculate_all_metrics(
             'total_return': 0.0,
             'annual_return': 0.0,
             'annual_volatility': 0.0,
-            'sharpe_ratio': 0.0,
-            'sortino_ratio': 0.0,
+            'sharpe': 0.0,
+            'sortino': 0.0,
             'max_drawdown': 0.0,
-            'calmar_ratio': 0.0,
+            'calmar': 0.0,
             'win_rate': 0.0,
             'n_periods': 0
         }
@@ -347,10 +347,10 @@ def calculate_all_metrics(
         'total_return': total_return,
         'annual_return': annual_return,
         'annual_volatility': annual_vol,
-        'sharpe_ratio': calculate_sharpe_ratio(returns, risk_free_rate, annualization_factor),
-        'sortino_ratio': calculate_sortino_ratio(returns, risk_free_rate, annualization_factor),
+        'sharpe': calculate_sharpe_ratio(returns, risk_free_rate, annualization_factor),
+        'sortino': calculate_sortino_ratio(returns, risk_free_rate, annualization_factor),
         'max_drawdown': calculate_max_drawdown(returns),
-        'calmar_ratio': calculate_calmar_ratio(returns, annualization_factor),
+        'calmar': calculate_calmar_ratio(returns, annualization_factor),
         'win_rate': calculate_win_rate(returns),
         'n_periods': len(returns)
     }
@@ -376,8 +376,8 @@ def save_agent_results(
         models_dir: Models directory (default: from config)
     """
     if results_dir is None:
-        from .config import RESULTS_DIR
-        results_dir = RESULTS_DIR
+        from .config import MODELS_DIR
+        results_dir = MODELS_DIR
 
     # Add timestamp
     results['saved_at'] = datetime.now().isoformat()
@@ -388,6 +388,43 @@ def save_agent_results(
         json.dump(results, f, indent=2)
 
     print(f"✅ Results saved to {file_path}")
+
+
+def compile_base_agent_results(
+    agent_type: str,
+    agent_name: str,
+    reward_type: str,
+    training_history: Dict,
+    train_results: Dict,
+    val_results: Dict,
+    test_results: Dict
+) -> Dict:
+    """
+    Compile base agent results into standardized format for saving.
+
+    Args:
+        agent_type: Type of agent ('technical' or 'sentiment')
+        agent_name: Name of agent (e.g., 'technical_ema_sharpe')
+        reward_type: Reward type used (e.g., 'ema_sharpe')
+        training_history: Training history dictionary
+        train_results: Training evaluation results from evaluate_agent()
+        val_results: Validation evaluation results from evaluate_agent()
+        test_results: Test evaluation results from evaluate_agent()
+
+    Returns:
+        Complete results dictionary ready for saving
+    """
+    return {
+        'agent_type': agent_type,
+        'agent_name': agent_name,
+        'reward_type': reward_type,
+        'training_history': training_history,
+        'performance': {
+            'train': {**train_results['metrics'], 'returns': train_results['returns']},
+            'val': {**val_results['metrics'], 'returns': val_results['returns']},
+            'test': {**test_results['metrics'], 'returns': test_results['returns']}
+        }
+    }
 
 
 def load_agent_results(
@@ -405,8 +442,8 @@ def load_agent_results(
         Dictionary of results
     """
     if results_dir is None:
-        from .config import RESULTS_DIR
-        results_dir = RESULTS_DIR
+        from .config import MODELS_DIR
+        results_dir = MODELS_DIR
 
     file_path = results_dir / f'{agent_name}_results.json'
 
@@ -434,10 +471,10 @@ def print_metrics(metrics: Dict[str, float], title: str = "Performance Metrics")
     print(f"Total Return:       {metrics.get('total_return', 0)*100:>8.2f}%")
     print(f"Annual Return:      {metrics.get('annual_return', 0)*100:>8.2f}%")
     print(f"Annual Volatility:  {metrics.get('annual_volatility', 0)*100:>8.2f}%")
-    print(f"Sharpe Ratio:       {metrics.get('sharpe_ratio', 0):>8.2f}")
-    print(f"Sortino Ratio:      {metrics.get('sortino_ratio', 0):>8.2f}")
+    print(f"Sharpe Ratio:       {metrics.get('sharpe', 0):>8.2f}")
+    print(f"Sortino Ratio:      {metrics.get('sortino', 0):>8.2f}")
     print(f"Max Drawdown:       {metrics.get('max_drawdown', 0)*100:>8.2f}%")
-    print(f"Calmar Ratio:       {metrics.get('calmar_ratio', 0):>8.2f}")
+    print(f"Calmar Ratio:       {metrics.get('calmar', 0):>8.2f}")
     print(f"Win Rate:           {metrics.get('win_rate', 0)*100:>8.2f}%")
     print(f"N Periods:          {metrics.get('n_periods', 0):>8d}")
     print("="*70 + "\n")

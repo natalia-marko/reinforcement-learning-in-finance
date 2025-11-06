@@ -22,7 +22,7 @@ from stable_baselines3 import PPO
 
 from .environments import PortfolioEnv
 from .utils import prepare_env_data, load_features, load_returns
-from .config import N_ASSETS, TICKERS, DATA_DIR, AGENT_MODELS_DIR
+from .config import N_ASSETS, TICKERS, DATA_DIR, MODELS_DIR
 
 
 # ============================================================================
@@ -72,8 +72,8 @@ class BaseAgentWrapper:
     def reset(self):
         """Reset to beginning of episode."""
         self.current_step = 0
-        # Reset to zero positions (100% cash) - starting state for each episode
-        self.positions = np.zeros(N_ASSETS)
+        # state for each episode
+        self.positions = np.ones(N_ASSETS) / N_ASSETS
 
     def get_action(self, step: Optional[int] = None) -> np.ndarray:
         """
@@ -240,18 +240,13 @@ class SuperAgentEnv(gym.Env):
 
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, bool, Dict]:
         """Execute step."""
-        # Normalize blending weights
-        weights = np.clip(action, 0, 1)
-        if weights.sum() > 0:
-            weights = weights / weights.sum()
-        else:
-            weights = np.array([0.5, 0.5])  # Equal weight fallback
+        # FIXED: Constrain blending weights to force balanced blending, min 0.2/max 0.8
+        weights = np.clip(action, 0.2, 0.8)
+        weights = weights / weights.sum()
 
-        # Get base agent actions
+        # Get base agent actions and blend
         tech_action = self.technical_agent.step()
         sent_action = self.sentiment_agent.step()
-
-        # Blend actions
         blended_action = weights[0] * tech_action + weights[1] * sent_action
 
         # Normalize blended action
@@ -277,8 +272,9 @@ class SuperAgentEnv(gym.Env):
         self.positions = blended_action.copy()
         self.episode_returns.append(portfolio_return_net)
 
-        # Calculate reward
-        reward = self.reward_function(portfolio_return_net)
+        # FIXED: Add diversity bonus to reward (entropy of blend weights)
+        blend_entropy = -np.sum(weights * np.log(weights + 1e-8))
+        reward = self.reward_function(portfolio_return_net) + 0.1 * blend_entropy
 
         # Advance step
         self.current_step += 1
@@ -461,25 +457,39 @@ class MetaAgentEnv(gym.Env):
 
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, bool, Dict]:
         """Execute step."""
-        # Get super agent action
+        # Get super agent blend weights (2,)
         super_obs = self.super_env._get_observation()
-        super_action, _ = self.super_agent.predict(super_obs, deterministic=True)
+        blend_weights, _ = self.super_agent.predict(super_obs, deterministic=True)
 
-        # Normalize super action
-        if super_action.sum() > 0:
-            super_action = super_action / super_action.sum()
+        # Normalize blend weights
+        blend_weights = np.clip(blend_weights, 0, 1)
+        if blend_weights.sum() > 0:
+            blend_weights = blend_weights / blend_weights.sum()
         else:
-            super_action = np.ones(self.n_assets) / self.n_assets
+            blend_weights = np.array([0.5, 0.5])
 
-        # Apply adjustment
+        # Get base agent actions to create blended portfolio (7,)
+        tech_action = self.super_env.technical_agent.get_action(self.current_step)
+        sent_action = self.super_env.sentiment_agent.get_action(self.current_step)
+
+        # Blend base agents to get portfolio (7,)
+        blended_portfolio = blend_weights[0] * tech_action + blend_weights[1] * sent_action
+
+        # Normalize blended portfolio
+        if blended_portfolio.sum() > 0:
+            blended_portfolio = blended_portfolio / blended_portfolio.sum()
+        else:
+            blended_portfolio = np.ones(self.n_assets) / self.n_assets
+
+        # Apply meta agent adjustment to blended portfolio
         adjustment = np.clip(action, 0, 2)
-        adjusted_action = super_action * adjustment
+        adjusted_action = blended_portfolio * adjustment
 
         # Normalize adjusted action
         if adjusted_action.sum() > 0:
             adjusted_action = adjusted_action / adjusted_action.sum()
         else:
-            adjusted_action = super_action  # Fallback to super action
+            adjusted_action = blended_portfolio  # Fallback to blended portfolio
 
         # Calculate transaction costs
         trades = np.abs(adjusted_action - self.positions)
@@ -685,8 +695,8 @@ if __name__ == '__main__':
     print("Run notebooks 02_base_agents.ipynb first.\n")
 
     # Check if models exist
-    tech_model = AGENT_MODELS_DIR / 'technical_ema_sharpe.zip'
-    sent_model = AGENT_MODELS_DIR / 'sentiment_ema_sharpe.zip'
+    tech_model = MODELS_DIR / 'technical_ema_sharpe.zip'
+    sent_model = MODELS_DIR / 'sentiment_ema_sharpe.zip'
 
     if tech_model.exists() and sent_model.exists():
         print("✅ Base agent models found!")
