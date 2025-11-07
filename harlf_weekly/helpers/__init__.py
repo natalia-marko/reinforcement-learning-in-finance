@@ -64,7 +64,16 @@ from .utils import (
     plot_equity_curve,
     plot_drawdown,
     plot_returns_distribution,
-    plot_allocation_heatmap
+    plot_allocation_heatmap,
+    plot_hierarchical_agent_training,
+    # Notebook utilities
+    verify_required_files,
+    print_metadata_summary,
+    compare_agents_across_splits,
+    analyze_blending_weights,
+    save_hierarchical_results,
+    analyze_regime_performance,
+    plot_agent_comparison
 )
 
 from .train import (
@@ -130,6 +139,14 @@ __all__ = [
     'plot_drawdown',
     'plot_returns_distribution',
     'plot_allocation_heatmap',
+    'plot_hierarchical_agent_training',
+    'verify_required_files',
+    'print_metadata_summary',
+    'compare_agents_across_splits',
+    'analyze_blending_weights',
+    'save_hierarchical_results',
+    'analyze_regime_performance',
+    'plot_agent_comparison',
     # Training
     'train_base_agent',
     'evaluate_agent',

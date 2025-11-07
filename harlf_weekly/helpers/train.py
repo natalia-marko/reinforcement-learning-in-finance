@@ -317,6 +317,34 @@ def train_base_agent(
         if eval_callback.early_stopped:
             print(f"   Early stopped at step {eval_callback.n_calls}")
 
+    # Export callback evaluation history to CSV
+    if verbose > 0:
+        print(f"\n💾 Exporting training logs...")
+
+    eval_history_df = pd.DataFrame(eval_callback.evaluation_history)
+    training_log_path = MODELS_DIR / f'{agent_name}_training_log.csv'
+    eval_history_df.to_csv(training_log_path, index=False)
+
+    if verbose > 0:
+        print(f"   Training log saved to {training_log_path}")
+
+    # Evaluate on train and validation splits ONLY
+    # Test set is held out for final evaluation in notebook 05
+    if verbose > 0:
+        print(f"\n📊 Evaluating trained agent on train/val splits...")
+
+    # Load best model for evaluation
+    if save_model and save_path.exists():
+        model = PPO.load(save_path)
+
+    train_results = evaluate_agent(model, agent_type, 'train', reward_type, n_episodes=1, verbose=0)
+    val_results = evaluate_agent(model, agent_type, 'val', reward_type, n_episodes=1, verbose=0)
+
+    if verbose > 0:
+        print(f"   Train Sharpe: {train_results['metrics']['sharpe']:.3f}")
+        print(f"   Val Sharpe:   {val_results['metrics']['sharpe']:.3f}")
+        print(f"   (Test set held out for final backtest)")
+
     # Compile training history
     training_history = {
         'agent_type': agent_type,
@@ -329,6 +357,26 @@ def train_base_agent(
         'evaluation_history': eval_callback.evaluation_history,
         'config': config.to_dict()
     }
+
+    # Compile complete results using utility function
+    from .utils import compile_base_agent_results, save_agent_results
+
+    compiled_results = compile_base_agent_results(
+        agent_type=agent_type,
+        agent_name=agent_name,
+        reward_type=reward_type,
+        training_history=training_history,
+        train_results=train_results,
+        val_results=val_results,
+    )
+
+    # Save compiled results to JSON
+    save_agent_results(agent_name, compiled_results, results_dir=MODELS_DIR)
+
+    if verbose > 0:
+        print(f"\n✅ Training and evaluation complete!")
+        print(f"   Model saved to: {save_path if save_model else 'Not saved'}")
+        print(f"   Results saved to: {MODELS_DIR / f'{agent_name}_results.json'}")
 
     return model, training_history
 
@@ -603,21 +651,40 @@ def train_super_agent(
             print(f"   Early stopped at step {callback.n_calls}")
         print(f"   Best mean reward: {callback.best_mean_reward:.4f}")
 
+    # Export callback evaluation history to CSV
+    if verbose > 0:
+        print(f"\n💾 Exporting training logs...")
+
+    eval_history_df = pd.DataFrame(callback.evaluation_history)
+    training_log_path = MODELS_DIR / f'{model_name}_training_log.csv'
+    eval_history_df.to_csv(training_log_path, index=False)
+
+    if verbose > 0:
+        print(f"   Training log saved to {training_log_path}")
+
     # Prepare history - metrics now properly calculated by EvaluationCallback
-    # Note: train evaluation not implemented yet, so train metrics will be empty
     history = {
-        'train_rewards': [],  # Not tracked (callback only evaluates on val_env)
-        'val_rewards': [eval_data['mean_reward'] for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
-        'train_sharpe': [],  # Not tracked
-        'val_sharpe': [eval_data.get('sharpe', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
-        'train_returns': [],  # Not tracked
-        'val_returns': [eval_data.get('annual_return', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
-        'train_drawdown': [],  # Not tracked
-        'val_drawdown': [eval_data.get('max_drawdown', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'model_name': model_name,
+        'model_type': 'super_agent',
+        'training_time': training_time,
+        'total_steps': callback.n_calls,
         'best_reward': callback.best_mean_reward,
         'early_stopped': callback.early_stopped,
-        'training_time': training_time
+        'evaluation_history': callback.evaluation_history,
+        'val_rewards': [eval_data['mean_reward'] for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'val_sharpe': [eval_data.get('sharpe', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'val_returns': [eval_data.get('annual_return', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'val_drawdown': [eval_data.get('max_drawdown', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'config': config.__name__
     }
+
+    # Save history to JSON
+    from .utils import save_agent_results
+    save_agent_results(model_name, history, results_dir=MODELS_DIR)
+
+    if verbose > 0:
+        print(f"   Results saved to: {MODELS_DIR / f'{model_name}_results.json'}")
+        print(f"\n✅ Training complete!")
 
     return model, history
 
@@ -746,21 +813,40 @@ def train_meta_agent(
             print(f"   Early stopped at step {callback.n_calls}")
         print(f"   Best mean reward: {callback.best_mean_reward:.4f}")
 
+    # Export callback evaluation history to CSV
+    if verbose > 0:
+        print(f"\n💾 Exporting training logs...")
+
+    eval_history_df = pd.DataFrame(callback.evaluation_history)
+    training_log_path = MODELS_DIR / f'{model_name}_training_log.csv'
+    eval_history_df.to_csv(training_log_path, index=False)
+
+    if verbose > 0:
+        print(f"   Training log saved to {training_log_path}")
+
     # Prepare history - metrics now properly calculated by EvaluationCallback
-    # Note: train evaluation not implemented yet, so train metrics will be empty
     history = {
-        'train_rewards': [],  # Not tracked (callback only evaluates on val_env)
-        'val_rewards': [eval_data['mean_reward'] for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
-        'train_sharpe': [],  # Not tracked
-        'val_sharpe': [eval_data.get('sharpe', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
-        'train_returns': [],  # Not tracked
-        'val_returns': [eval_data.get('annual_return', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
-        'train_drawdown': [],  # Not tracked
-        'val_drawdown': [eval_data.get('max_drawdown', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'model_name': model_name,
+        'model_type': 'meta_agent',
+        'training_time': training_time,
+        'total_steps': callback.n_calls,
         'best_reward': callback.best_mean_reward,
         'early_stopped': callback.early_stopped,
-        'training_time': training_time
+        'evaluation_history': callback.evaluation_history,
+        'val_rewards': [eval_data['mean_reward'] for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'val_sharpe': [eval_data.get('sharpe', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'val_returns': [eval_data.get('annual_return', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'val_drawdown': [eval_data.get('max_drawdown', 0.0) for eval_data in callback.evaluation_history if eval_data.get('split') == 'val'],
+        'config': config.__name__
     }
+
+    # Save history to JSON
+    from .utils import save_agent_results
+    save_agent_results(model_name, history, results_dir=MODELS_DIR)
+
+    if verbose > 0:
+        print(f"   Results saved to: {MODELS_DIR / f'{model_name}_results.json'}")
+        print(f"\n✅ Training complete!")
 
     return model, history
 

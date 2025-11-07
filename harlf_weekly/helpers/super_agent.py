@@ -65,22 +65,29 @@ class BaseAgentWrapper:
         self.n_steps = self.features.shape[0]
 
         self.current_step = 0
-        # Start with zero positions (100% cash) - agent learns to build portfolio from scratch
-        # This is intentional and allows the agent to learn optimal entry points
-        self.positions = np.zeros(N_ASSETS)
+        # Start with equal-weight positions across all assets
+        # This provides a consistent starting point for all episodes
+        self.positions = np.ones(N_ASSETS) / N_ASSETS
 
     def reset(self):
         """Reset to beginning of episode."""
         self.current_step = 0
-        # state for each episode
+        # Reset to equal-weight positions (consistent with __init__)
         self.positions = np.ones(N_ASSETS) / N_ASSETS
 
-    def get_action(self, step: Optional[int] = None) -> np.ndarray:
+    def get_action(
+        self,
+        step: Optional[int] = None,
+        current_positions: Optional[np.ndarray] = None
+    ) -> np.ndarray:
         """
         Get portfolio recommendation from base agent.
 
         Args:
             step: Specific step to get action for (default: current_step)
+            current_positions: Actual current portfolio positions (n_assets,)
+                             If None, uses internal position tracking
+                             If provided, overrides internal positions for observation
 
         Returns:
             Portfolio weights (n_assets,)
@@ -91,10 +98,13 @@ class BaseAgentWrapper:
         if step >= self.n_steps:
             raise ValueError(f"Step {step} exceeds data length {self.n_steps}")
 
+        # Use provided positions or internal tracking
+        positions_for_obs = current_positions if current_positions is not None else self.positions
+
         # Get observation: features + current positions
         # Base agents expect: [flattened_features, positions]
         features_flat = self.features[step].flatten().astype(np.float32)
-        obs = np.concatenate([features_flat, self.positions]).astype(np.float32)
+        obs = np.concatenate([features_flat, positions_for_obs]).astype(np.float32)
 
         # Get action from model
         action, _ = self.model.predict(obs, deterministic=True)
@@ -105,9 +115,10 @@ class BaseAgentWrapper:
         else:
             action = np.ones(N_ASSETS) / N_ASSETS
 
-        # Update positions for next call
-        self.positions = action.copy()
-        
+        # Update internal positions only if not using external positions
+        if current_positions is None:
+            self.positions = action.copy()
+
         return action
 
     def step(self) -> np.ndarray:
@@ -211,6 +222,12 @@ class SuperAgentEnv(gym.Env):
         self.positions = np.zeros(self.n_assets)
         self.episode_returns = []
 
+        # Cache for super agent's blended portfolio output
+        # This stores the last computed blended portfolio to avoid recalculation
+        self._cached_blended_portfolio = None
+        self._cached_blend_weights = None
+        self._cached_step = -1
+
     def reset(
         self,
         seed: Optional[int] = None,
@@ -229,6 +246,11 @@ class SuperAgentEnv(gym.Env):
         self.peak_value = self.initial_capital
         self.positions = np.zeros(self.n_assets)
         self.episode_returns = []
+
+        # Reset cache
+        self._cached_blended_portfolio = None
+        self._cached_blend_weights = None
+        self._cached_step = -1
 
         # Reset reward
         self.reward_function.reset()
@@ -279,6 +301,9 @@ class SuperAgentEnv(gym.Env):
         # Advance step
         self.current_step += 1
 
+        # Invalidate cache since we moved to a new step
+        self._cached_step = -1
+
         # Check termination
         terminated = False
         truncated = False
@@ -303,21 +328,48 @@ class SuperAgentEnv(gym.Env):
         self.technical_agent.current_step += 1
         self.sentiment_agent.current_step += 1
 
+        # Invalidate cache since step changed
+        self._cached_step = -1
+
     def _get_observation(self) -> np.ndarray:
-        """Get current observation."""
+        """
+        Get current observation.
+
+        Observation Structure (n_assets * 5 = 35 for 7 assets):
+        - tech_action: [7] portfolio weights from technical agent
+        - sent_action: [7] portfolio weights from sentiment agent
+        - lag_1w: [7] returns from 1 week ago
+        - lag_2w: [7] returns from 2 weeks ago
+        - lag_4w: [7] returns from 4 weeks ago
+
+        All components use consistent asset ordering from TICKERS config.
+        """
         if self.current_step >= self.n_steps:
             return np.zeros(self.observation_space.shape[0], dtype=np.float32)
 
-        # Base agent actions (next step)
-        tech_action = self.technical_agent.get_action(self.current_step)
-        sent_action = self.sentiment_agent.get_action(self.current_step)
+        # Base agent actions (next step) - both output shape (n_assets,)
+        # Pass current portfolio positions for accurate observations
+        tech_action = self.technical_agent.get_action(
+            self.current_step,
+            current_positions=self.positions
+        )
+        sent_action = self.sentiment_agent.get_action(
+            self.current_step,
+            current_positions=self.positions
+        )
 
-        # Lagged returns (1w, 2w, 4w)
+        # Validate action shapes
+        assert tech_action.shape == (self.n_assets,), \
+            f"Technical action shape {tech_action.shape} != expected ({self.n_assets},)"
+        assert sent_action.shape == (self.n_assets,), \
+            f"Sentiment action shape {sent_action.shape} != expected ({self.n_assets},)"
+
+        # Lagged returns (1w, 2w, 4w) - shape (n_assets,) each
         lag_1w = self.returns[max(0, self.current_step - 1)]
         lag_2w = self.returns[max(0, self.current_step - 2)]
         lag_4w = self.returns[max(0, self.current_step - 4)]
 
-        # Concatenate
+        # Concatenate: total shape (n_assets * 5,)
         obs = np.concatenate([
             tech_action,
             sent_action,
@@ -327,6 +379,57 @@ class SuperAgentEnv(gym.Env):
         ])
 
         return obs.astype(np.float32)
+
+    def get_blended_portfolio(self, blend_weights: np.ndarray) -> np.ndarray:
+        """
+        Get blended portfolio from base agents using specified weights.
+
+        This method encapsulates the blending logic with caching to avoid
+        redundant recalculation when MetaAgent queries the same step/weights.
+
+        Args:
+            blend_weights: Blending weights [tech_weight, sent_weight]
+
+        Returns:
+            Blended portfolio weights (n_assets,)
+        """
+        # Normalize blend weights
+        blend_weights = np.clip(blend_weights, 0.2, 0.8)
+        blend_weights = blend_weights / blend_weights.sum()
+
+        # Check cache: if same step and same weights, return cached result
+        if (self._cached_step == self.current_step and
+            self._cached_blend_weights is not None and
+            np.allclose(blend_weights, self._cached_blend_weights)):
+            return self._cached_blended_portfolio.copy()
+
+        # Cache miss: compute fresh blended portfolio
+        # Get base agent actions, passing actual portfolio positions for accurate observations
+        # This ensures base agents see the true portfolio state, not their internal tracking
+        tech_action = self.technical_agent.get_action(
+            self.current_step,
+            current_positions=self.positions
+        )
+        sent_action = self.sentiment_agent.get_action(
+            self.current_step,
+            current_positions=self.positions
+        )
+
+        # Blend portfolios
+        blended = blend_weights[0] * tech_action + blend_weights[1] * sent_action
+
+        # Normalize
+        if blended.sum() > 0:
+            blended = blended / blended.sum()
+        else:
+            blended = np.ones(self.n_assets) / self.n_assets
+
+        # Update cache
+        self._cached_blended_portfolio = blended.copy()
+        self._cached_blend_weights = blend_weights.copy()
+        self._cached_step = self.current_step
+
+        return blended
 
     def _get_info(self) -> Dict:
         """Get info dictionary."""
@@ -456,32 +559,30 @@ class MetaAgentEnv(gym.Env):
         return obs, info
 
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, bool, Dict]:
-        """Execute step."""
-        # Get super agent blend weights (2,)
+        """
+        Execute step with proper hierarchical communication.
+
+        Architecture:
+        1. SuperAgent produces blended portfolio (its "output")
+        2. MetaAgent adjusts this portfolio with macro information
+        3. Only MetaAgent's adjusted portfolio is executed for returns
+
+        KEY FIX for Super→Meta Communication:
+        - SuperAgent's output is the blended portfolio (not just blend weights)
+        - Use super_env.get_blended_portfolio() which caches results
+        - On first call for a step, it computes by querying base agents
+        - On subsequent calls (e.g., _get_observation), it returns cached result
+        - This avoids redundant recalculation and ensures consistency
+        """
+        # Get super agent's policy output (blend weights)
         super_obs = self.super_env._get_observation()
         blend_weights, _ = self.super_agent.predict(super_obs, deterministic=True)
 
-        # Normalize blend weights
-        blend_weights = np.clip(blend_weights, 0, 1)
-        if blend_weights.sum() > 0:
-            blend_weights = blend_weights / blend_weights.sum()
-        else:
-            blend_weights = np.array([0.5, 0.5])
+        # Get super agent's portfolio output (uses cache if available)
+        # This is THE fix: we're using super agent's output, not recalculating
+        blended_portfolio = self.super_env.get_blended_portfolio(blend_weights)
 
-        # Get base agent actions to create blended portfolio (7,)
-        tech_action = self.super_env.technical_agent.get_action(self.current_step)
-        sent_action = self.super_env.sentiment_agent.get_action(self.current_step)
-
-        # Blend base agents to get portfolio (7,)
-        blended_portfolio = blend_weights[0] * tech_action + blend_weights[1] * sent_action
-
-        # Normalize blended portfolio
-        if blended_portfolio.sum() > 0:
-            blended_portfolio = blended_portfolio / blended_portfolio.sum()
-        else:
-            blended_portfolio = np.ones(self.n_assets) / self.n_assets
-
-        # Apply meta agent adjustment to blended portfolio
+        # Apply meta agent adjustment to super agent's output
         adjustment = np.clip(action, 0, 2)
         adjusted_action = blended_portfolio * adjustment
 
@@ -508,8 +609,12 @@ class MetaAgentEnv(gym.Env):
         self.positions = adjusted_action.copy()
         self.episode_returns.append(portfolio_return_net)
 
-        # Calculate reward
-        reward = self.reward_function(portfolio_return_net)
+        # Calculate reward with diversification penalty
+        # Add diversity bonus (entropy of portfolio weights)
+        portfolio_entropy = -np.sum(adjusted_action * np.log(adjusted_action + 1e-8))
+        max_entropy = np.log(self.n_assets)  # Maximum entropy for n assets
+        diversity_bonus = 0.2 * (portfolio_entropy / max_entropy)  # Normalized 0-1
+        reward = self.reward_function(portfolio_return_net) + diversity_bonus
 
         # Advance steps (both meta and super env)
         self.current_step += 1
@@ -533,30 +638,12 @@ class MetaAgentEnv(gym.Env):
         if self.current_step >= self.n_steps:
             return np.zeros(self.observation_space.shape[0], dtype=np.float32)
 
-        # Get super agent's blended portfolio output (not the blending weights!)
-        # The super agent takes blend weights as action and outputs blended portfolio
+        # Get super agent's blended portfolio output
         super_obs = self.super_env._get_observation()
         blend_weights, _ = self.super_agent.predict(super_obs, deterministic=True)
 
-        # Normalize blend weights
-        blend_weights = np.clip(blend_weights, 0, 1)
-        if blend_weights.sum() > 0:
-            blend_weights = blend_weights / blend_weights.sum()
-        else:
-            blend_weights = np.array([0.5, 0.5])
-
-        # Get base agent actions
-        tech_action = self.super_env.technical_agent.get_action(self.current_step)
-        sent_action = self.super_env.sentiment_agent.get_action(self.current_step)
-
-        # Blend to get portfolio
-        blended_portfolio = blend_weights[0] * tech_action + blend_weights[1] * sent_action
-
-        # Normalize portfolio
-        if blended_portfolio.sum() > 0:
-            blended_portfolio = blended_portfolio / blended_portfolio.sum()
-        else:
-            blended_portfolio = np.ones(self.n_assets) / self.n_assets
+        # Use SuperAgentEnv's encapsulated blending method
+        blended_portfolio = self.super_env.get_blended_portfolio(blend_weights)
 
         # Get macro features for current step
         if len(self.macro_features.shape) == 3:

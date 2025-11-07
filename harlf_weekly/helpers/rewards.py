@@ -33,7 +33,9 @@ class EMASharpeReward:
         risk_free_rate: float = 0.04,
         target_sharpe: float = 2.0,
         annualization_factor: float = 52.0,
-        epsilon: float = 1e-8
+        epsilon: float = 1e-8,
+        adaptive_target: bool = False,
+        adaptive_alpha: float = 0.01
     ):
         """
         Initialize EMA Sharpe reward calculator.
@@ -42,26 +44,39 @@ class EMASharpeReward:
             alpha: EMA smoothing factor (0 < alpha <= 1)
                    Lower = smoother, Higher = more responsive
             risk_free_rate: Annual risk-free rate (e.g., 0.04 = 4%)
-            target_sharpe: Target Sharpe ratio for normalization
+            target_sharpe: Target Sharpe ratio for normalization (initial value if adaptive)
             annualization_factor: Factor to annualize weekly returns (52 weeks/year)
             epsilon: Small constant to avoid division by zero
+            adaptive_target: If True, target_sharpe adapts to observed Sharpe ratios
+            adaptive_alpha: Smoothing factor for adaptive target (lower = more stable)
         """
         self.alpha = alpha
         self.risk_free_rate = risk_free_rate / annualization_factor  # Weekly rf rate
+        self.initial_target_sharpe = target_sharpe
         self.target_sharpe = target_sharpe
         self.annualization_factor = annualization_factor
         self.epsilon = epsilon
+        self.adaptive_target = adaptive_target
+        self.adaptive_alpha = adaptive_alpha
 
         # State variables
         self.ema_return = 0.0
         self.ema_return_sq = 0.0
         self.initialized = False
+        self.step_count = 0
 
     def reset(self):
-        """Reset state for new episode."""
+        """
+        Reset state for new episode.
+
+        Note: target_sharpe is NOT reset if adaptive_target=True,
+        allowing it to carry learned normalization across episodes.
+        """
         self.ema_return = 0.0
         self.ema_return_sq = 0.0
         self.initialized = False
+        self.step_count = 0
+        # Keep target_sharpe to maintain learned normalization
 
     def __call__(self, portfolio_return: float) -> float:
         """
@@ -73,6 +88,8 @@ class EMASharpeReward:
         Returns:
             Sharpe-based reward
         """
+        self.step_count += 1
+
         # Initialize on first call
         if not self.initialized:
             self.ema_return = portfolio_return
@@ -95,8 +112,19 @@ class EMASharpeReward:
         # Annualize Sharpe
         sharpe_annual = sharpe * np.sqrt(self.annualization_factor)
 
+        # Adaptive target: update target_sharpe based on observed Sharpe
+        if self.adaptive_target and self.step_count > 10:  # Wait for stabilization
+            # Smoothly adapt target toward observed Sharpe (clipped to reasonable range)
+            observed_sharpe = np.clip(np.abs(sharpe_annual), 0.5, 5.0)
+            self.target_sharpe = (
+                (1 - self.adaptive_alpha) * self.target_sharpe +
+                self.adaptive_alpha * observed_sharpe
+            )
+            # Keep target within reasonable bounds
+            self.target_sharpe = np.clip(self.target_sharpe, 0.5, 4.0)
+
         # Normalize by target Sharpe (so reward ~1.0 at target)
-        reward = sharpe_annual / self.target_sharpe
+        reward = sharpe_annual / (self.target_sharpe + self.epsilon)
 
         return reward
 
@@ -106,7 +134,8 @@ class EMASharpeReward:
             return {
                 'ema_return': 0.0,
                 'ema_std': 0.0,
-                'sharpe': 0.0
+                'sharpe': 0.0,
+                'target_sharpe': self.target_sharpe
             }
 
         ema_variance = self.ema_return_sq - self.ema_return ** 2
@@ -117,7 +146,9 @@ class EMASharpeReward:
         return {
             'ema_return': self.ema_return * self.annualization_factor,  # Annualized
             'ema_std': ema_std * np.sqrt(self.annualization_factor),
-            'sharpe': sharpe_annual
+            'sharpe': sharpe_annual,
+            'target_sharpe': self.target_sharpe,
+            'reward_scaling': sharpe_annual / (self.target_sharpe + self.epsilon)
         }
 
 
