@@ -26,6 +26,9 @@ from .environments import create_env
 from .config import BaseAgentConfig, MODELS_DIR, ACTIVATION_FUNCTIONS
 from .utils import calculate_all_metrics, print_metrics
 
+# Line 21: Add import
+from .softmax_policy import SoftmaxActorCriticPolicy
+
 # ============================================================================
 # EVALUATION CALLBACK
 # ============================================================================
@@ -256,8 +259,9 @@ def train_base_agent(
     if verbose > 0:
         print("\n🤖 Creating PPO model...")
 
+    # Line 259: Change policy to custom softmax policy
     model = PPO(
-        policy='MlpPolicy',
+        policy=SoftmaxActorCriticPolicy,  # Use custom softmax policy
         env=train_env,
         learning_rate=config.LEARNING_RATE,
         n_steps=config.N_STEPS,
@@ -605,9 +609,9 @@ def train_super_agent(
         print(f"Config: {config.__name__}")
         print(f"Total timesteps: {config.TOTAL_TIMESTEPS:,}")
 
-    # Create model
+    # Create model with Softmax policy (ensures blending weights sum to 1.0)
     model = PPO(
-        'MlpPolicy',
+        SoftmaxActorCriticPolicy,  # Use custom softmax policy
         train_env,
         learning_rate=config.LEARNING_RATE,
         n_steps=config.N_STEPS,
@@ -767,9 +771,9 @@ def train_meta_agent(
         print(f"Config: {config.__name__}")
         print(f"Total timesteps: {config.TOTAL_TIMESTEPS:,}")
 
-    # Create model
+    # Create model with Softmax policy (ensures portfolio weights sum to 1.0)
     model = PPO(
-        'MlpPolicy',
+        SoftmaxActorCriticPolicy,  # Use custom softmax policy
         train_env,
         learning_rate=config.LEARNING_RATE,
         n_steps=config.N_STEPS,

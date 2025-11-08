@@ -62,7 +62,7 @@ class EnvironmentConfig:
 
     # Position constraints
     MIN_POSITION = 0.0        # No short selling
-    MAX_POSITION = 1.0        # Maximum 100% in single asset
+    MAX_POSITION = 0.5        # Maximum 100% in single asset
     MIN_CASH = 0.0            # Minimum cash position (0% = fully invested allowed)
 
     # Initial capital
@@ -70,13 +70,13 @@ class EnvironmentConfig:
 
     # Risk constraints
     MAX_LEVERAGE = 1.0        # No leverage (1.0 = 100% invested max)
-    MAX_DRAWDOWN = 0.3        # 30% max drawdown before forced liquidation
+    MAX_DRAWDOWN = 0.25        # 30% max drawdown before forced liquidation
 
     # Episode parameters
     LOOKBACK_WINDOW = 52      # Number of past weeks to include in state (1 year)
 
     # Normalization
-    NORMALIZE_OBSERVATIONS = True
+    NORMALIZE_OBSERVATIONS = False
     NORMALIZE_RETURNS = True
 
     @classmethod
@@ -105,7 +105,7 @@ class RewardConfig:
 
     # EMA Sharpe Reward
     EMA_ALPHA = 0.1           # EMA smoothing factor (0.1 = ~20 period)
-    TARGET_SHARPE = 2.0       # Target annual Sharpe ratio
+    TARGET_SHARPE = 3.0       # Target annual Sharpe ratio
     RISK_FREE_RATE = 0.04     # 4% annual risk-free rate
 
     # Multi-Objective Reward Weights
@@ -155,6 +155,9 @@ class BaseAgentConfig:
     VF_COEF = 0.5             # Value function coefficient
     MAX_GRAD_NORM = 0.5       # Gradient clipping
 
+    # L2 regularization
+    L2_REG = 1e-5             # L2 regularization factor (weight decay)
+
     # Training duration
     TOTAL_TIMESTEPS = 200000  # Total training steps
 
@@ -163,11 +166,11 @@ class BaseAgentConfig:
     ACTIVATION = 'tanh'       # Activation function
 
     # Evaluation
-    EVAL_FREQ = 10000         # Evaluate every N steps
+    EVAL_FREQ = 20000         # Evaluate every N steps
     N_EVAL_EPISODES = 10      # Episodes per evaluation
 
     # Early stopping
-    PATIENCE = 5              # Evaluations without improvement before stopping
+    PATIENCE = 10              # Evaluations without improvement before stopping
     MIN_DELTA = 0.01          # Minimum improvement threshold
 
     @classmethod
@@ -184,6 +187,7 @@ class BaseAgentConfig:
             'ent_coef': cls.ENT_COEF,
             'vf_coef': cls.VF_COEF,
             'max_grad_norm': cls.MAX_GRAD_NORM,
+            'l2_reg': cls.L2_REG,
             'total_timesteps': cls.TOTAL_TIMESTEPS,
             'net_arch': cls.NET_ARCH,
             'activation': cls.ACTIVATION,
@@ -209,7 +213,7 @@ class SuperAgentConfig:
     GAMMA = 0.99
     GAE_LAMBDA = 0.95
     CLIP_RANGE = 0.2
-    ENT_COEF = 0.02          # Lower entropy for more stable meta-policy
+    ENT_COEF = 0.01          # Lower entropy for more stable meta-policy
     VF_COEF = 0.5
     MAX_GRAD_NORM = 0.5
 
@@ -226,7 +230,7 @@ class SuperAgentConfig:
 
     # Early stopping
     PATIENCE = 10
-    MIN_DELTA = 0.05
+    MIN_DELTA = 0.02
 
     @classmethod
     def to_dict(cls):
@@ -452,6 +456,7 @@ def print_config_summary():
     print(f"   Learning Rate: {BaseAgentConfig.LEARNING_RATE}")
     print(f"   Total Timesteps: {BaseAgentConfig.TOTAL_TIMESTEPS:,}")
     print(f"   Network: {BaseAgentConfig.NET_ARCH}")
+    print(f"   L2 Reg: {BaseAgentConfig.L2_REG}")
 
     print(f"\n🦸 Super Agent:")
     print(f"   Learning Rate: {SuperAgentConfig.LEARNING_RATE}")
