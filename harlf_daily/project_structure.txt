@@ -1,0 +1,47 @@
+harlf_project/
+  data_hierarchical/
+    technical/
+      - train.csv
+      - val.csv
+      - test.csv
+    sentiment/
+      - train.csv
+      - val.csv
+      - test.csv
+    returns/
+      - returns_train.csv
+      - returns_val.csv
+      - returns_test.csv
+    metadata.json
+      Project metadata (tickers, features, splits)
+  models/
+    - base_agents_production.json
+    - super_agent_production.pt
+    - super_agent_production_analysis.json
+    - agent_models/ (e.g., technical_ema_sharpe_PPO.zip)
+  notebooks/
+    01_data_prep.ipynb
+      Data loading, merging tech/sent/macro, visualizations (e.g., returns plots)
+    02_base_agents.ipynb
+      Train technical (price/volume/momentum) and sentiment (news/market/risk) agents
+    03_super_agent.ipynb
+      Train super to blend bases + lag returns, visualize training history
+    04_meta_agent.ipynb
+      Train meta to adjust super with all data + macro, final eval + weights heatmap
+    05_backtest.ipynb
+      Run full system on test, equity curve viz, summary metrics (Sharpe)
+  helpers/
+    config.py
+      Configs for training/rewards/envs
+    environments.py
+      PortfolioEnv class, create_env (customized for feature selection)
+    rewards.py
+      EMA Sharpe, Multi-Objective rewards
+    train.py
+      Train function for bases (PPO)
+    super_agent.py
+      BaseWrapper, Super/Meta WrapperEnvs, Policies, train/eval/analyze/viz methods
+    utils.py
+      Load data, compute Sharpe/risk, print/save results, plots
+  README.md
+    Project overview: RL for portfolio opt w/ tech + sent + macro; Run notebooks sequentially
