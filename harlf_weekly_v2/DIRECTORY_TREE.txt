@@ -1,0 +1,123 @@
+harlf_weekly_v2/
+│
+├── 📂 01_data_preparation/
+│   ├── data_preparation_part1_v2.py       ⭐ Main data pipeline
+│   ├── get_sentiment_data.ipynb
+│   ├── sentiment_data_retrieve.ipynb
+│   └── README.md                          📚 Data prep guide
+│
+├── 📂 02_part1_base_agents/
+│   ├── environments_part1.py              ⭐ RL environments
+│   ├── train_part1_agents.ipynb           📓 Original training (EMA)
+│   ├── retrain_base_agents.ipynb          📓 With visualizations
+│   │
+│   ├── ema_sharpe_approach.py             🟢 Baseline reward (EMA)
+│   ├── differential_sharpe_approach.py    🔵 Differential Sharpe reward
+│   ├── multi_objective.py                 🔴 Multi-objective reward (optimized)
+│   │
+│   ├── compare_reward_functions.py        📊 Compare all approaches
+│   ├── compare_reward_functions.ipynb     📓 Interactive comparison
+│   ├── tune_multi_objective.py            🎛️  Hyperparameter tuning
+│   │
+│   └── README.md                          📚 Training & reward functions guide
+│
+├── 📂 03_part2_super_agent/
+│   ├── super_agent_enviroment.py          🎯 Super agent environment
+│   ├── train_super_agent.ipynb            📓 Hierarchical training
+│   └── README.md                          📚 Super agent guide
+│
+├── 📂 data_hierarchical/                  💾 Processed data
+│   ├── technical/
+│   │   ├── train.csv                      (normalized features)
+│   │   ├── val.csv
+│   │   └── test.csv
+│   ├── sentiment/
+│   │   ├── train.csv
+│   │   ├── val.csv
+│   │   └── test.csv
+│   ├── returns_train.csv
+│   ├── returns_val.csv
+│   ├── returns_test.csv
+│   └── metadata.json                      📋 Features & normalization params
+│
+├── 📂 sentiment_data/                     📰 Raw sentiment data
+│   ├── market_sentiment_chart.png
+│   ├── market_sentiment_weekly.csv
+│   └── market_sentiment_wide.csv
+│
+├── 📂 models_part1/                       🤖 Base agent models (EMA Sharpe)
+│   ├── best_technical_ppo.zip             (Test Sharpe: 1.78)
+│   ├── best_sentiment_sac.zip             (Test Sharpe: 1.92)
+│   └── best_models_part1.json
+│
+├── 📂 models_diff_sharpe/                 🤖 Differential Sharpe models
+│   ├── diff_sharpe_technical_*.zip
+│   ├── diff_sharpe_sentiment_*.zip
+│   └── results.json
+│
+├── 📂 models_multi_objective/             🤖 Multi-objective models
+│   ├── multi_obj_technical_ppo.zip        (Test Sharpe: 1.91)
+│   ├── multi_obj_sentiment_ppo.zip
+│   └── results.json
+│
+├── 📂 models_super_agent/                 🤖 Super agent models (future)
+│
+├── 📂 plots/                              📊 All visualizations
+│   ├── README.md                          📚 Plotting guide
+│   ├── training/
+│   │   └── (training plots)
+│   ├── reward_comparison/
+│   │   └── (comparison plots)
+│   └── tuning/
+│       └── (tuning results)
+│
+├── 📂 docs/                               📚 Documentation
+│   ├── parameters_used.md                 📋 Feature specifications
+│   ├── PENALTY_OPTIMIZATION.md            🎛️  Multi-objective tuning
+│   ├── TUNING_GUIDE.md                    📖 How to tune
+│   └── REWARD_COMPARISON_README.md        📊 Comparison guide
+│
+├── 📂 configs/                            ⚙️  Configuration files (future)
+│
+├── README.md                              📖 Main project README
+├── PROJECT_STRUCTURE.md                   🗂️  Detailed structure guide
+├── ORGANIZATION_SUMMARY.md                ✅ Organization summary
+├── QUICK_START.md                         🚀 5-minute quick start
+└── DIRECTORY_TREE.txt                     🌳 This visual tree
+
+═══════════════════════════════════════════════════════════════════
+
+WORKFLOW:  01 → 02 → 03
+
+01: Data Preparation         → Prepare & normalize data
+02: Base Agents & Rewards    → Train agents, compare reward functions
+03: Super Agent              → Hierarchical combination
+
+═══════════════════════════════════════════════════════════════════
+
+KEY FILES:
+
+⭐ START HERE:
+   01_data_preparation/data_preparation_part1_v2.py
+   02_part1_base_agents/retrain_base_agents.ipynb
+
+🎯 COMPARE REWARD FUNCTIONS:
+   02_part1_base_agents/compare_reward_functions.ipynb
+   
+🏆 BEST PERFORMANCE:
+   models_part1/best_sentiment_sac.zip (Test Sharpe: 1.92)
+   
+📚 DOCUMENTATION:
+   PROJECT_STRUCTURE.md (comprehensive guide)
+   
+═══════════════════════════════════════════════════════════════════
+
+REWARD FUNCTIONS IN 02_part1_base_agents/:
+
+🟢 EMA Sharpe (Baseline)         - Simple, proven (Sharpe ~1.85)
+🔵 Differential Sharpe           - Theoretically grounded
+🔴 Multi-Objective (Optimized)   - Best risk control
+
+Try different approaches to find what works best for your data!
+
+═══════════════════════════════════════════════════════════════════
