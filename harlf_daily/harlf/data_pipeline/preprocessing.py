@@ -10,8 +10,8 @@ from scipy.stats.mstats import winsorize
 from sklearn.preprocessing import StandardScaler
 import pickle
 
-from harlf import config
-from harlf import utils
+from harlf.config import defaults as config
+from harlf.utils import io as utils
 
 
 def winsorize_features(train_df, val_df=None, test_df=None, limits=None):

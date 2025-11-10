@@ -25,15 +25,15 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
 
-from harlf.envs.portfolio_env import PortfolioEnv
-from harlf.agents.dirichlet_policy import SoftmaxActorCriticPolicy
+from harlf.core.envs.portfolio_env import PortfolioEnv
+from harlf.core.agents.dirichlet_policy import SoftmaxActorCriticPolicy
 from harlf.training.callbacks import (
     PortfolioWeightsLogger,
     BestModelCallback,
     MetricsTrackingCallback,
     PeriodicCheckpointCallback,
 )
-from harlf.config import TICKERS
+from harlf.config.defaults import TICKERS
 
 
 def make_env(fold_id: int, split: str, reward_type: str = 'ema_sharpe', **reward_kwargs):

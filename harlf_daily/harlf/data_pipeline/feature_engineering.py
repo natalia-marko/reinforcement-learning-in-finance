@@ -12,8 +12,8 @@ from ta.volume import MFIIndicator
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
-from harlf import config
-from harlf import utils
+from harlf.config import defaults as config
+from harlf.utils import io as utils
 
 
 def calculate_momentum_features(close_prices):

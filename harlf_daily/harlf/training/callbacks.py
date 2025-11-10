@@ -116,7 +116,7 @@ class PortfolioWeightsLogger(BaseCallback):
                     weights = info['weights']
 
                     # Log each ticker weight
-                    from harlf.config import TICKERS
+                    from harlf.config.defaults import TICKERS
                     for i, ticker in enumerate(TICKERS):
                         self.logger.record(f'weights/{ticker}', weights[i])
 

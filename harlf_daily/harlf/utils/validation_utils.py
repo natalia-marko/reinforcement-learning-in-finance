@@ -5,10 +5,9 @@ Phase 6: Walk-Forward Validation Setup
 
 import pandas as pd
 import numpy as np
-
-from harlf.config import defaults as config
-from harlf.utils import io as utils
-from . import preprocessing
+import config
+import utils
+import preprocessing
 
 
 def walk_forward_split(data, n_splits=None, train_size=None, val_size=None, test_size=None):
@@ -154,13 +153,6 @@ def load_fold_indices(filepath):
 def save_fold_data(fold_id, train_df, val_df, test_df):
     """
     Save train/val/test data for a specific fold
-    Splits data into features and targets to prevent normalization issues
-
-    Features (normalized):
-        - Technical indicators, volume, macro, etc. (for agent observation)
-
-    Targets (raw, NOT normalized):
-        - forward_log_return, forward_return, close_price (for environment rewards)
 
     Parameters:
     -----------
@@ -175,39 +167,14 @@ def save_fold_data(fold_id, train_df, val_df, test_df):
     """
     fold_files = config.get_fold_files(fold_id)
 
-    # Identify target columns that should NOT be normalized
-    target_cols = [col for col in config.TARGET_COLUMNS if col in train_df.columns]
+    utils.save_dataframe(train_df, fold_files['train'])
+    utils.save_dataframe(val_df, fold_files['val'])
+    utils.save_dataframe(test_df, fold_files['test'])
 
-    # Also preserve ticker column if present
-    meta_cols = ['ticker'] if 'ticker' in train_df.columns else []
-    all_preserve_cols = target_cols + meta_cols
-
-    # Split into features and targets for each dataset
-    for split_name, df in [('train', train_df), ('val', val_df), ('test', test_df)]:
-        if len(target_cols) > 0:
-            # Extract target columns
-            targets = df[all_preserve_cols].copy()
-
-            # Extract feature columns (everything except targets)
-            features = df.drop(columns=target_cols).copy()
-
-            # Save features and targets separately
-            utils.save_dataframe(features, fold_files[f'{split_name}_features'])
-            utils.save_dataframe(targets, fold_files[f'{split_name}_targets'])
-
-            config.log(f"  {split_name.capitalize()}: {features.shape[1]} features + {len(target_cols)} targets")
-        else:
-            # No target columns - save as features only
-            utils.save_dataframe(df, fold_files[f'{split_name}_features'])
-            config.log(f"  {split_name.capitalize()}: {df.shape[1]} columns (no targets)")
-
-        # Also save combined file for backward compatibility
-        utils.save_dataframe(df, fold_files[split_name])
-
-    config.log(f"Saved fold {fold_id} data (split into features and targets)")
+    config.log(f"Saved fold {fold_id} data")
 
 
-def load_fold_data(fold_id, separate_files=True):
+def load_fold_data(fold_id):
     """
     Load train/val/test data for a specific fold
 
@@ -215,72 +182,19 @@ def load_fold_data(fold_id, separate_files=True):
     -----------
     fold_id : int
         Fold ID
-    separate_files : bool
-        If True, load from separate features/targets files and merge
-        If False, load from combined legacy files
 
     Returns:
     --------
     tuple
         (train_df, val_df, test_df)
-        OR
-        ((train_features, train_targets), (val_features, val_targets), (test_features, test_targets))
-        if separate_files=True and return_separate=True
     """
     fold_files = config.get_fold_files(fold_id)
 
-    if separate_files:
-        # Load features and targets separately, then merge
-        train_features = utils.load_dataframe(fold_files['train_features'])
-        train_targets = utils.load_dataframe(fold_files['train_targets'])
-        train_df = pd.concat([train_features, train_targets], axis=1)
-
-        val_features = utils.load_dataframe(fold_files['val_features'])
-        val_targets = utils.load_dataframe(fold_files['val_targets'])
-        val_df = pd.concat([val_features, val_targets], axis=1)
-
-        test_features = utils.load_dataframe(fold_files['test_features'])
-        test_targets = utils.load_dataframe(fold_files['test_targets'])
-        test_df = pd.concat([test_features, test_targets], axis=1)
-    else:
-        # Load from combined legacy files
-        train_df = utils.load_dataframe(fold_files['train'])
-        val_df = utils.load_dataframe(fold_files['val'])
-        test_df = utils.load_dataframe(fold_files['test'])
+    train_df = utils.load_dataframe(fold_files['train'])
+    val_df = utils.load_dataframe(fold_files['val'])
+    test_df = utils.load_dataframe(fold_files['test'])
 
     return train_df, val_df, test_df
-
-
-def load_fold_data_separate(fold_id):
-    """
-    Load train/val/test data as separate features and targets
-
-    Parameters:
-    -----------
-    fold_id : int
-        Fold ID
-
-    Returns:
-    --------
-    tuple of tuples
-        ((train_features, train_targets),
-         (val_features, val_targets),
-         (test_features, test_targets))
-    """
-    fold_files = config.get_fold_files(fold_id)
-
-    train_features = utils.load_dataframe(fold_files['train_features'])
-    train_targets = utils.load_dataframe(fold_files['train_targets'])
-
-    val_features = utils.load_dataframe(fold_files['val_features'])
-    val_targets = utils.load_dataframe(fold_files['val_targets'])
-
-    test_features = utils.load_dataframe(fold_files['test_features'])
-    test_targets = utils.load_dataframe(fold_files['test_targets'])
-
-    return ((train_features, train_targets),
-            (val_features, val_targets),
-            (test_features, test_targets))
 
 
 def prepare_fold(fold_id, fold, features_df, preprocess=True):
@@ -338,14 +252,12 @@ def prepare_fold(fold_id, fold, features_df, preprocess=True):
 
 def process_all_folds(features_df, max_folds=None, save_data=True):
     """
-    Process all folds with GLOBAL normalization (prevents data leakage)
-
-    ✅ CRITICAL: Uses ONE global scaler fitted on fold 0 training data for ALL folds
+    Process all folds with feature engineering and preprocessing
 
     Parameters:
     -----------
     features_df : pd.DataFrame
-        All features (ALREADY LAGGED in feature engineering)
+        All features
     max_folds : int
         Maximum number of folds to process (None = all)
     save_data : bool
@@ -357,13 +269,9 @@ def process_all_folds(features_df, max_folds=None, save_data=True):
         List of folds with metadata
     dict
         Preprocessing parameters for all folds
-    StandardScaler
-        Global scaler
-    list
-        Feature column names
     """
     config.log("\n" + "="*60)
-    config.log("PROCESSING ALL WALK-FORWARD FOLDS WITH GLOBAL SCALER")
+    config.log("PROCESSING ALL WALK-FORWARD FOLDS")
     config.log("="*60)
 
     # Create walk-forward splits
@@ -374,58 +282,27 @@ def process_all_folds(features_df, max_folds=None, save_data=True):
         folds = folds[:max_folds]
         config.log(f"Limited to {max_folds} folds")
 
-    # ✅ CRITICAL: Create GLOBAL scaler from fold 0 training data ONLY
-    fold_0_train_indices = folds[0]['train']
-    global_scaler, feature_cols = preprocessing.create_global_scaler(
-        features_df, fold_0_train_indices
-    )
-
-    # Save global scaler
-    import pickle
-    global_scaler_path = config.WALK_FORWARD_DIR / 'global_scaler.pkl'
-    with open(global_scaler_path, 'wb') as f:
-        pickle.dump(global_scaler, f)
-    config.log(f"Saved global scaler: {global_scaler_path}")
-
     # Save fold indices
     save_fold_indices(folds, config.METADATA_FILES['fold_indices'])
 
-    # ✅ Process each fold using GLOBAL scaler
+    # Process each fold
     all_preprocessing_params = {}
 
     for fold in folds:
         fold_id = fold['fold_id']
 
-        config.log(f"\n{'='*60}")
-        config.log(f"PROCESSING FOLD {fold_id}")
-        config.log(f"{'='*60}")
-        config.log(f"Train: {fold['train_start']} to {fold['train_end']} ({len(fold['train'])} days)")
-        config.log(f"Val:   {fold['val_start']} to {fold['val_end']} ({len(fold['val'])} days)")
-        config.log(f"Test:  {fold['test_start']} to {fold['test_end']} ({len(fold['test'])} days)")
-
-        # Extract fold data
-        train_df = features_df.loc[fold['train']].copy()
-        val_df = features_df.loc[fold['val']].copy()
-        test_df = features_df.loc[fold['test']].copy()
-
-        config.log(f"\nRaw data shapes:")
-        config.log(f"  Train: {train_df.shape}")
-        config.log(f"  Val:   {val_df.shape}")
-        config.log(f"  Test:  {test_df.shape}")
-
-        # ✅ Preprocess using GLOBAL scaler (not per-fold scaler)
-        train, val, test, winsorization_bounds = preprocessing.preprocess_fold_with_global_scaler(
-            train_df, val_df, test_df,
-            global_scaler, feature_cols,
-            winsorize=True
+        # Prepare fold with preprocessing
+        train, val, test, params, scaler = prepare_fold(
+            fold_id, fold, features_df, preprocess=True
         )
 
+        # Save scaler
+        if scaler is not None:
+            scaler_path = preprocessing.save_scaler(scaler, fold_id)
+            params['scaler_path'] = scaler_path
+
         # Store preprocessing params
-        all_preprocessing_params[f'fold_{fold_id}'] = {
-            'winsorization': winsorization_bounds,
-            'global_scaler_path': str(global_scaler_path),
-            'feature_cols': feature_cols,
-        }
+        all_preprocessing_params[f'fold_{fold_id}'] = params
 
         # Save fold data
         if save_data:
@@ -438,10 +315,10 @@ def process_all_folds(features_df, max_folds=None, save_data=True):
     )
 
     config.log("\n" + "="*60)
-    config.log(f"PROCESSED {len(folds)} FOLDS WITH GLOBAL NORMALIZATION")
+    config.log(f"PROCESSED {len(folds)} FOLDS SUCCESSFULLY")
     config.log("="*60)
 
-    return folds, all_preprocessing_params, global_scaler, feature_cols
+    return folds, all_preprocessing_params
 
 
 def get_fold_summary(folds):

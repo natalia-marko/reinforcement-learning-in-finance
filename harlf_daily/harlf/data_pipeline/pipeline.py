@@ -8,8 +8,8 @@ import numpy as np
 from pathlib import Path
 import time
 
-from harlf import config
-from harlf import utils
+from harlf.config import defaults as config
+from harlf.utils import io as utils
 from harlf.data_pipeline import data_download
 from harlf.data_pipeline import feature_engineering
 from harlf.data_pipeline import validation

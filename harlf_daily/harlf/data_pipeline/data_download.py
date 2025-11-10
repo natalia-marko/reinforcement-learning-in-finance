@@ -8,8 +8,8 @@ import numpy as np
 import yfinance as yf
 from pandas_datareader import data as pdr
 
-from harlf import config
-from harlf import utils
+from harlf.config import defaults as config
+from harlf.utils import io as utils
 
 
 def download_stock_data():
