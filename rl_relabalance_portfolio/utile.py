@@ -450,22 +450,23 @@ def calculate_volatility_features(df: pd.DataFrame) -> pd.DataFrame:
             result.loc[mask, f'bb_position_{period}w'] = (close_series - bb_low_multi) / (bb_high_multi - bb_low_multi + 1e-10)
         
         for period in [4, 13, 26]:
-            result.loc[mask, f'downside_volatility_{period}w'] = (
-                returns.rolling(period).apply(lambda x: x[x < 0].std() * np.sqrt(52), raw=False)
-            )
-            result.loc[mask, f'upside_volatility_{period}w'] = (
-                returns.rolling(period).apply(lambda x: x[x > 0].std() * np.sqrt(52), raw=False)
-            )
-        
-        # Volatility ratio (upside/downside)
-        for period in [4, 13, 26]:
+            # Calculate directional volatilities with fallback to total volatility
+            total_vol = returns.rolling(period).std() * np.sqrt(52)
+
             downside_vol = returns.rolling(period).apply(
-                lambda x: x[x < 0].std() * np.sqrt(52), raw=False
+                lambda x: x[x < 0].std() * np.sqrt(52) if len(x[x < 0]) > 1 else (x.std() * np.sqrt(52) if len(x) > 1 else 0),
+                raw=False
             )
             upside_vol = returns.rolling(period).apply(
-                lambda x: x[x > 0].std() * np.sqrt(52), raw=False
+                lambda x: x[x > 0].std() * np.sqrt(52) if len(x[x > 0]) > 1 else (x.std() * np.sqrt(52) if len(x) > 1 else 0),
+                raw=False
             )
-            result.loc[mask, f'volatility_ratio_{period}w'] = upside_vol / (downside_vol + 1e-10)
+            result.loc[mask, f'downside_volatility_{period}w'] = downside_vol
+            result.loc[mask, f'upside_volatility_{period}w'] = upside_vol
+            # Volatility ratio: use 1.0 as neutral value when either is near zero
+            result.loc[mask, f'volatility_ratio_{period}w'] = np.where(
+                downside_vol < 1e-6, 1.0, upside_vol / downside_vol
+            )
         
         # Parkinson volatility estimator (using high-low)
         for period in [4, 13, 26]:
@@ -656,34 +657,34 @@ def calculate_drawdown_features(df: pd.DataFrame) -> pd.DataFrame:
         drawdown_duration = in_drawdown.groupby((in_drawdown != in_drawdown.shift()).cumsum()).cumsum()
         result.loc[mask, 'drawdown_duration'] = drawdown_duration
         
-        # Average drawdown
+        # Drawdown features using expanding max (true drawdown from all-time high)
+        running_max = close_series.expanding().max()
+        drawdown_series = (close_series - running_max) / (running_max + 1e-10)
+
         for period in [4, 13, 26, 52]:
+            # Max drawdown in period = most negative value in rolling window
+            result.loc[mask, f'max_drawdown_{period}w'] = drawdown_series.rolling(period).min()
+
+            # Average drawdown in period = mean drawdown in rolling window
+            result.loc[mask, f'avg_drawdown_{period}w'] = drawdown_series.rolling(period).mean()
+
+            # Drawdown volatility in period
+            result.loc[mask, f'drawdown_volatility_{period}w'] = drawdown_series.rolling(period).std()
+
+            # Recovery factor: ratio of potential gain to potential loss
             period_max = close_series.rolling(period).max()
-            max_dd = (close_series - period_max) / (period_max + 1e-10)
-            result.loc[mask, f'max_drawdown_{period}w'] = max_dd
-            
-            # Average drawdown (mean of negative drawdowns)
-            negative_dd = max_dd.copy()
-            negative_dd[negative_dd >= 0] = np.nan
-            avg_dd = negative_dd.rolling(period).mean()
-            result.loc[mask, f'avg_drawdown_{period}w'] = avg_dd
-            
-            # Drawdown volatility
-            dd_vol = max_dd.rolling(period).std()
-            result.loc[mask, f'drawdown_volatility_{period}w'] = dd_vol
-            
             period_min = close_series.rolling(period).min()
             recovery = (period_max - close_series) / (close_series - period_min + 1e-10)
             result.loc[mask, f'recovery_factor_{period}w'] = recovery
         
-        # Ulcer Index at multiple periods
+        # Ulcer Index at multiple periods (using drawdown_series from expanding max)
         for period in [13, 26, 52]:
-            squared_dd = (current_dd ** 2).rolling(period).mean()
+            squared_dd = (drawdown_series ** 2).rolling(period).mean()
             result.loc[mask, f'ulcer_index_{period}w'] = np.sqrt(squared_dd)
-        
-        # Pain Index at multiple periods
+
+        # Pain Index at multiple periods (mean absolute drawdown, avoiding double rolling)
         for period in [13, 26, 52]:
-            pain = abs(current_dd[current_dd < 0]).rolling(period).mean()
+            pain = abs(drawdown_series).rolling(period).mean()
             result.loc[mask, f'pain_index_{period}w'] = pain
         
         # Maximum adverse excursion (MAE) and maximum favorable excursion (MFE)
@@ -725,21 +726,26 @@ def calculate_statistical_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def calculate_calendar_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Calculate calendar and cyclical features."""
+    """Calculate calendar and cyclical features.
+
+    Note: sin_dow and cos_dow are excluded for weekly data as they are constant
+    (all weekly data points fall on the same day of week, typically Friday).
+    """
     result = df.copy()
-    
+
     if 'date' in result.columns:
         dates = pd.to_datetime(result['date'])
     else:
         dates = pd.to_datetime(result.index)
-    
+
     result['sin_month'] = np.sin(2 * np.pi * dates.dt.month / 12)
     result['cos_month'] = np.cos(2 * np.pi * dates.dt.month / 12)
-    result['sin_dow'] = np.sin(2 * np.pi * dates.dt.dayofweek / 7)
-    result['cos_dow'] = np.cos(2 * np.pi * dates.dt.dayofweek / 7)
+    # Skip sin_dow/cos_dow for weekly data - they're constant (same day each week)
+    # result['sin_dow'] = np.sin(2 * np.pi * dates.dt.dayofweek / 7)
+    # result['cos_dow'] = np.cos(2 * np.pi * dates.dt.dayofweek / 7)
     result['sin_dom'] = np.sin(2 * np.pi * dates.dt.day / 31)
     result['cos_dom'] = np.cos(2 * np.pi * dates.dt.day / 31)
-    
+
     return result
 
 
@@ -829,40 +835,6 @@ def remove_highly_correlated_features(
     
     return result, to_remove
 
-
-def apply_pca_filtering(
-    df: pd.DataFrame,
-    feature_cols: List[str],
-    n_components: Optional[int] = None,
-    variance_threshold: float = 0.95
-) -> Tuple[pd.DataFrame, Optional[PCA]]:
-    """Apply PCA for dimensionality reduction."""
-    result = df.copy()
-    available_cols = [col for col in feature_cols if col in result.columns]
-    
-    if len(available_cols) == 0:
-        return result, None
-    
-    feature_data = result[available_cols].fillna(0)
-    
-    if n_components is None:
-        pca = PCA()
-        pca.fit(feature_data)
-        cumsum_variance = np.cumsum(pca.explained_variance_ratio_)
-        n_components = np.argmax(cumsum_variance >= variance_threshold) + 1
-    
-    pca = PCA(n_components=n_components)
-    pca_features = pca.fit_transform(feature_data)
-    
-    pca_cols = [f'pca_component_{i+1}' for i in range(n_components)]
-    pca_df = pd.DataFrame(pca_features, index=result.index, columns=pca_cols)
-    
-    result = result.drop(columns=available_cols)
-    result = pd.concat([result, pca_df], axis=1)
-    
-    return result, pca
-
-
 def split_data(
     df: pd.DataFrame,
     train_ratio: float = 0.8,
@@ -930,8 +902,6 @@ def preprocess_pipeline(
     train_ratio: float = 0.8,
     clip_percentiles: Tuple[float, float] = (0.01, 0.99),
     corr_threshold: float = 0.95,
-    use_pca: bool = False,
-    pca_variance_threshold: float = 0.95,
     date_col: str = 'date'
 ) -> Dict[str, any]:
     """Complete preprocessing pipeline: outlier removal, correlation filtering, split, normalization."""
@@ -953,12 +923,7 @@ def preprocess_pipeline(
     result, removed_features = remove_highly_correlated_features(
         result, feature_cols, corr_threshold
     )
-    
-    pca_obj = None
-    if use_pca:
-        result, pca_obj = apply_pca_filtering(
-            result, feature_cols, variance_threshold=pca_variance_threshold
-        )
+
     
     splits = split_data(result, train_ratio, date_col)
     
@@ -980,11 +945,6 @@ def preprocess_pipeline(
         if col not in non_feature_cols
     ]
     
-    if use_pca and pca_obj is not None:
-        pca_cols = [col for col in splits['train'].columns if col.startswith('pca_component_')]
-        updated_feature_cols = [col for col in updated_feature_cols if not col.startswith('pca_component_')]
-        updated_feature_cols.extend(pca_cols)
-    
     if len(updated_feature_cols) == 0:
         raise ValueError(
             f"No feature columns remaining after preprocessing. "
@@ -1002,6 +962,5 @@ def preprocess_pipeline(
         'test': test_norm,
         'scaler': scaler,
         'removed_features': removed_features + constant_features_removed,
-        'pca': pca_obj
     }
 

@@ -19,7 +19,7 @@ FRED API       Indicators       Correlation       (Chronological)    (Train-fitt
 
 ### Key Features
 
-- **Comprehensive Feature Set**: 200+ features across 15+ categories
+- **Comprehensive Feature Set**: ~158 features across 8 categories, reduced to 100 via importance-based selection
 - **Time-Series Aware**: Proper handling of chronological data with no data leakage
 - **Production Ready**: Modular code structure with reusable utilities
 - **Reproducible**: Complete documentation and version-controlled preprocessing steps
@@ -528,12 +528,12 @@ df_filtered, removed_features = remove_highly_correlated_features(
 **Algorithm**:
 1. Calculate absolute correlation matrix
 2. Identify upper triangle pairs with correlation > threshold
-3. Remove one feature from each highly correlated pair
+3. Remove one feature from each highly correlated pair (keeps feature with higher variance)
 4. Return list of removed features for documentation
 
 **Rationale**: Highly correlated features provide redundant information and can cause numerical instability in neural networks.
 
-**Note**: In practice, the threshold is set to **0.9** (not 0.95) for more aggressive filtering, reducing features from ~160 to ~110 for RL model training.
+**Note**: The threshold is set to **0.95** in the pipeline, reducing features from ~158 to ~125. Further reduction to 100 features is done via SHAP-based importance selection (see Feature Selection section).
 
 #### Step 4: Optional PCA Dimensionality Reduction
 
@@ -613,9 +613,7 @@ preprocessed = preprocess_pipeline(
     feature_cols=feature_cols,
     train_ratio=0.8,
     clip_percentiles=(0.01, 0.99),
-    corr_threshold=0.9,  # More aggressive filtering for RL models
-    use_pca=False,  # Set to True for dimensionality reduction
-    pca_variance_threshold=0.95,
+    corr_threshold=0.95,  # Remove features with |correlation| > 0.95
     date_col='date'
 )
 
@@ -626,6 +624,276 @@ scaler = preprocessed['scaler']        # Fitted StandardScaler
 removed_features = preprocessed['removed_features']  # List of removed features
 pca_obj = preprocessed['pca']         # PCA object if used, else None
 ```
+
+---
+
+## Principal Component Analysis (PCA)
+
+### Overview
+
+**Location**: `notebooks/01_data_preparation.ipynb` (Cells 16-19)
+
+PCA analysis is performed to determine the intrinsic dimensionality of the feature space and identify redundant dimensions. Unlike traditional PCA dimensionality reduction, this analysis is used for **exploratory purposes** to understand feature relationships, not to transform the data.
+
+### Methodology
+
+**Step 1: Data Preparation**
+
+Before PCA, features are filtered to:
+1. Include only features that exist in `train_df` (some may have been removed during preprocessing)
+2. Remove zero-variance features (they cause numerical issues in PCA)
+3. Fill remaining NaN values with 0
+
+```python
+# Filter features_after_corr to only include features that exist in train_df
+non_feature_cols = ['date', 'ticker', 'open', 'high', 'low', 'close', 'volume']
+available_features = [col for col in train_df.columns if col not in non_feature_cols]
+features_for_pca = [f for f in features_after_corr if f in available_features]
+
+# Remove zero-variance features
+zero_var_features = X_pca.columns[X_pca.var() == 0]
+features_for_pca = [f for f in features_for_pca if f not in zero_var_features]
+```
+
+**Step 2: PCA Computation**
+
+PCA is fitted on all components to analyze the complete variance structure:
+
+```python
+from sklearn.decomposition import PCA
+
+pca = PCA()
+pca.fit(X_pca)
+cumulative_variance = np.cumsum(pca.explained_variance_ratio_)
+```
+
+**Step 3: Variance Threshold Analysis**
+
+The analysis identifies the number of components needed to capture different variance thresholds:
+
+- **90% variance**: Good balance between dimensionality reduction and information retention
+- **95% variance**: Conservative reduction, retains most information
+- **99% variance**: Near-complete information capture
+
+```python
+n_90 = np.argmax(cumulative_variance >= 0.90) + 1
+n_95 = np.argmax(cumulative_variance >= 0.95) + 1
+n_99 = np.argmax(cumulative_variance >= 0.99) + 1
+```
+
+**Example Results** (from actual pipeline):
+- Components for 90% variance: 34
+- Components for 95% variance: 48
+- Components for 99% variance: 77
+- Total components: 124
+
+### Component Analysis
+
+Each principal component is a linear combination of original features. The loadings show which features contribute most to each component:
+
+- **High positive/negative loadings**: Indicate strong contribution to that component
+- **Components are ordered**: By explained variance (first component explains most variance)
+- **Top components**: Typically capture market-wide trends, volatility patterns, and momentum
+
+**Example Component Interpretation**:
+- Component 1 (24% variance): Captures momentum and RSI patterns (mae_26w, rsi_14d, return_13w)
+- Component 2 (12% variance): Captures volatility and drawdown patterns (upside_volatility_26w, max_drawdown_26w)
+- Component 3 (8% variance): Captures macroeconomic and market regime patterns (gdp_growth, vix)
+
+### Use Case
+
+**Important**: PCA is used for **analysis only**, not for feature transformation. The insights inform feature selection by:
+1. Identifying which features contribute to high-variance components
+2. Understanding feature relationships and redundancy
+3. Validating that selected features capture sufficient information
+
+The actual features used for RL training remain in their original form (not PCA-transformed) to maintain interpretability.
+
+### Visualizations
+
+The notebook includes two PCA visualizations:
+
+1. **Scree Plot**: Shows explained variance ratio for first 50 components
+   - Helps identify the "elbow" where additional components add diminishing returns
+   - Vertical lines mark 90%, 95% variance thresholds
+
+2. **Cumulative Variance Plot**: Shows cumulative explained variance across all components
+   - Horizontal lines mark 90%, 95%, 99% thresholds
+   - Helps determine how many components are needed for different variance levels
+
+---
+
+## SHAP Analysis and Feature Importance
+
+### Overview
+
+**Location**: `notebooks/01_data_preparation.ipynb` (Cells 20-22)
+
+SHAP (SHapley Additive exPlanations) analysis is used to understand feature importance and contributions to model predictions. A Random Forest surrogate model is trained to predict future returns, and SHAP values explain which features drive these predictions.
+
+### Setup
+
+**Target Variable**: Future 1-week log returns
+
+```python
+# Calculate future returns for each ticker
+train_data_sorted = train_df.sort_values(['ticker', 'date']).copy()
+train_data_sorted['next_close'] = train_data_sorted.groupby('ticker')['close'].shift(-1)
+train_data_sorted['future_return'] = np.log(train_data_sorted['next_close'] / train_data_sorted['close'])
+train_data_clean = train_data_sorted.dropna(subset=['future_return']).copy()
+
+# Prepare features and target
+X_shap = train_data_clean[features_for_pca].fillna(0)
+y_shap = train_data_clean['future_return']
+```
+
+**Data Statistics** (example):
+- Features: 124
+- Samples: 1,379
+- Target: Future 1-week return
+
+### Random Forest Surrogate Model
+
+**Why Random Forest?**
+1. Handles non-linear relationships well
+2. Works efficiently with SHAP TreeExplainer (faster than KernelExplainer)
+3. Provides feature importance as fallback if SHAP unavailable
+
+**Model Configuration**:
+
+```python
+from sklearn.ensemble import RandomForestRegressor
+
+rf_model = RandomForestRegressor(
+    n_estimators=500,        # Number of trees (increased from 100 for better accuracy)
+    max_depth=10,            # Limit tree depth to prevent overfitting
+    min_samples_split=20,    # Minimum samples to split (prevents overfitting)
+    random_state=42,         # For reproducibility
+    n_jobs=-1                # Use all CPU cores
+)
+
+rf_model.fit(X_sample, y_sample)
+```
+
+**Training Data**: Uses all available samples (1,379 in example) for model training.
+
+**Model Performance**: Typical R² score around 0.46, indicating moderate predictive power suitable for feature importance analysis.
+
+### SHAP Value Computation
+
+**Sampling Strategy**: Uses all available samples for SHAP computation (computationally expensive but provides comprehensive analysis).
+
+```python
+import shap
+
+# Use all samples for comprehensive analysis
+shap_sample_size = len(X_sample)
+shap_indices = np.random.choice(len(X_sample), shap_sample_size, replace=False)
+X_shap_sample = X_sample.iloc[shap_indices]
+
+# Create SHAP explainer (TreeExplainer optimized for tree models)
+explainer = shap.TreeExplainer(rf_model)
+shap_values = explainer.shap_values(X_shap_sample)
+```
+
+**Note on Random Sampling**: For time series data, random sampling is acceptable for SHAP analysis because:
+- SHAP explains individual predictions, not training
+- Temporal order doesn't affect explanation of a single prediction
+- No data leakage risk (explaining existing predictions, not making new ones)
+
+**Computational Complexity**: O(n_samples × n_features × n_trees). With 1,379 samples × 124 features × 500 trees, computation takes several minutes.
+
+### Feature Importance Ranking
+
+**Mean Absolute SHAP Values**: Calculated to rank features by importance:
+
+```python
+mean_abs_shap = np.abs(shap_values).mean(axis=0)
+
+shap_importance = pd.DataFrame({
+    'feature': features_for_pca,
+    'mean_abs_shap': mean_abs_shap
+}).sort_values('mean_abs_shap', ascending=False)
+```
+
+**Top Features** (example from actual analysis):
+1. `obv_roc_1w` - On-Balance Volume rate of change (1 week)
+2. `treasury_10y` - 10-Year Treasury Yield
+3. `vix` - VIX Volatility Index
+4. `autocorr_1w` - Autocorrelation at lag 1
+5. `volume_trend_strength` - Volume trend strength
+
+**Interpretation**: Features with higher mean absolute SHAP values contribute more to model predictions on average. This ranking is used for feature selection.
+
+### Random Forest Feature Importance
+
+As a fallback/comparison, Random Forest's built-in feature importance is also calculated:
+
+```python
+rf_importance = pd.DataFrame({
+    'feature': features_for_pca,
+    'importance': rf_model.feature_importances_
+}).sort_values('importance', ascending=False)
+```
+
+Both SHAP and RF importance rankings are used to guide feature selection.
+
+---
+
+## Feature Selection
+
+### Overview
+
+**Location**: `notebooks/01_data_preparation.ipynb` (Cells 24-27)
+
+Feature selection combines correlation filtering (already done) with importance-based selection to create a final feature set optimized for RL training.
+
+### Selection Strategy
+
+**Target**: 100 features (balanced between information content and model complexity)
+
+**Rationale**:
+- Too few (<20): May miss important predictive signals
+- Too many (>50): Increases overfitting risk, slows training, adds noise
+- 100 features: Good balance for RL models with sufficient data
+
+**Selection Process**:
+
+1. **Start with Top Importance Features**: Select top 100 features by SHAP/RF importance
+```python
+target_n_features = 100
+top_shap_features = shap_importance.head(target_n_features)['feature'].tolist()
+```
+
+2. **Validation**: Ensure selected features don't have high correlation
+```python
+selected_corr = train_df[selected_features].corr()
+# Check for correlations > 0.98
+high_corr_count = sum of pairs with |correlation| > 0.98
+```
+
+**Result**: Typically 0 highly correlated pairs, with average correlation around 0.08, indicating good feature diversity.
+
+### Feature Reduction Summary
+
+**Pipeline Flow**:
+1. **Original Features**: ~158 features (after feature engineering)
+2. **After Correlation Filtering** (threshold=0.95): ~125 features
+3. **After SHAP-Based Selection**: 100 features
+
+**Removed Features**:
+- **High Correlation**: ~33 features removed due to correlation > 0.95
+- **Low Importance**: ~25 features removed based on SHAP/RF importance ranking
+
+### Final Feature Set
+
+**Characteristics**:
+- **Count**: 100 features
+- **Correlation**: Average correlation ~0.08, no pairs with |r| > 0.98
+- **Coverage**: Includes top features from all categories (momentum, volatility, volume, risk-adjusted, drawdown, statistical, calendar, macro)
+- **Quality**: Features selected based on predictive importance, not just variance
+
+**Usage**: These 100 features are used for RL agent training and saved in `metadata.json` as `feature_cols`.
 
 ---
 
@@ -784,6 +1052,94 @@ print(f"Train std range: [{train_std.min():.3f}, {train_std.max():.3f}]")
 
 ---
 
+## Visualizations
+
+### Overview
+
+**Location**: `notebooks/01_data_preparation.ipynb` (Cells 7, 15, 18, 23, 28)
+
+The notebook includes several visualizations to verify data quality, understand feature relationships, and validate preprocessing steps.
+
+### Price Data Overview
+
+**Cell 7**: Price and returns visualization
+
+**Visualizations**:
+1. **Price Chart**: Weekly close prices for all tickers over time
+   - Verifies data coverage and identifies gaps
+   - Checks for outliers or data quality issues
+   - Shows price trends across all assets
+
+2. **Returns Chart**: Weekly percentage returns
+   - Verifies returns are reasonable (typically -20% to +20% for weekly)
+   - Identifies extreme outliers that may indicate data errors
+   - Shows return distributions across assets
+
+**Output**: `results/price_data_overview.png`
+
+### Feature Correlation Matrix
+
+**Cell 15**: Correlation matrix visualization
+
+**Visualization**: Heatmap of correlation matrix for top 30 features by variance
+- Uses hierarchical clustering to group similar features
+- Upper triangle masked for clarity
+- Color scale: coolwarm (blue=negative, red=positive correlation)
+- Helps identify feature relationships and redundancy patterns
+
+**Purpose**: Validates correlation filtering effectiveness and identifies remaining feature relationships.
+
+### PCA Visualizations
+
+**Cell 18**: PCA analysis plots
+
+**Visualizations**:
+
+1. **Scree Plot**: Explained variance ratio for first 50 components
+   - Shows individual component contributions
+   - Vertical lines mark 90% and 95% variance thresholds
+   - Helps identify "elbow" where additional components add diminishing returns
+
+2. **Cumulative Variance Plot**: Cumulative explained variance across all components
+   - Shows total variance captured by N components
+   - Horizontal lines mark 90%, 95%, 99% thresholds
+   - Helps determine dimensionality reduction potential
+
+**Purpose**: Understands intrinsic dimensionality and validates feature selection decisions.
+
+### Feature Importance Visualization
+
+**Cell 23**: Feature importance bar chart
+
+**Visualization**: Horizontal bar chart of top 30 features by SHAP/RF importance
+- Features sorted by importance (highest at top)
+- Bar length represents mean absolute SHAP value or RF importance
+- Helps identify most predictive features
+
+**Purpose**: Guides feature selection and validates importance rankings.
+
+### Feature Distribution Comparison
+
+**Cell 28**: Normalized feature distributions (train vs test)
+
+**Visualization**: Histogram comparison for sample features
+- Shows normalized feature distributions for train and test sets
+- Overlaid histograms with transparency
+- Verifies normalization consistency between train/test
+
+**Output**: `results/feature_distributions.png`
+
+**Purpose**: Validates that normalization was applied correctly and train/test distributions are similar (as expected after normalization).
+
+### Visualization Best Practices
+
+1. **Save All Plots**: All visualizations are saved to `results/` directory for documentation
+2. **High Resolution**: Plots saved with `dpi=150` for publication quality
+3. **Clear Labels**: All plots include titles, axis labels, and legends
+4. **Consistent Styling**: Uses seaborn whitegrid style for consistency
+
+---
+
 ## Output Structure
 
 ### Directory Organization
@@ -801,9 +1157,11 @@ data/
 
 results/
 ├── price_data_overview.png         # Price and returns visualization
-├── feature_distributions.png       # Normalized feature distributions
-└── feature_correlation_matrix.png # Correlation matrix (hierarchically clustered)
+├── feature_distributions.png       # Normalized feature distributions (train vs test)
+└── feature_correlation_matrix.png # Correlation matrix (hierarchically clustered, top 30 features)
 ```
+
+**Note**: PCA and feature importance visualizations are displayed inline in the notebook but not saved to files. They can be saved by adding `plt.savefig()` calls if needed.
 
 ### Metadata Structure
 
@@ -811,16 +1169,24 @@ results/
 
 ```json
 {
-    "feature_cols": ["return_1w", "rsi_14d", ...],
-    "removed_features": ["feature_x", "feature_y"],
+    "feature_cols": ["obv_roc_1w", "treasury_10y", "vix", ...],
+    "removed_features": ["sortino_52w", "feature_x", "feature_y", ...],
     "train_start": "2020-01-03T00:00:00",
     "train_end": "2023-06-30T00:00:00",
     "test_start": "2023-07-07T00:00:00",
     "test_end": "2024-12-27T00:00:00",
-    "n_tickers": 8,
-    "tickers": ["AAPL", "AMZN", "GOOGL", "META", "MSFT", "NFLX", "NVDA", "TSLA"]
+    "n_tickers": 7,
+    "tickers": ["AAPL", "AMZN", "GOOGL", "META", "MSFT", "NFLX", "NVDA"]
 }
 ```
+
+**Key Fields**:
+- `feature_cols`: List of 100 final features selected via SHAP-based importance ranking
+- `removed_features`: Features removed during preprocessing (correlation filtering + low importance)
+- `train_start`, `train_end`: Date range for training data (80% of chronological data)
+- `test_start`, `test_end`: Date range for test data (20% of chronological data)
+- `n_tickers`: Number of unique tickers in the dataset
+- `tickers`: List of ticker symbols used
 
 **Usage**: Load metadata for RL environment setup:
 
@@ -1135,13 +1501,15 @@ assert len(overlap) == 0, f"Data leakage detected: {overlap}"
 | Statistical | 6 | 6 | skew_{13,26}w, kurt_{13,26}w, autocorr_1w, autocorr_4w (all use log returns) | `utile.py::calculate_statistical_features()` |
 | Calendar | 6 | 4 | sin_month, cos_month, sin_dow, cos_dow, sin_dom, cos_dom (sin_dow, cos_dow may be removed if constant for weekly data) | `utile.py::calculate_calendar_features()` |
 | Macro | 5 | 5 | treasury_10y, fed_funds_rate, vix, unemployment_rate, gdp_growth | `utile.py::merge_macro_data()` |
-| **Total** | **~160** | **~110** | | `utile.py::engineer_all_features()` |
+| **Total** | **~158** | **100** | | `utile.py::engineer_all_features()` |
 
 **Notes**: 
-- **Original count**: ~160 features before preprocessing
-- **Final count**: ~110 features after constant feature removal and correlation filtering (threshold=0.9)
+- **Original count**: ~158 features after feature engineering
+- **After correlation filtering** (threshold=0.95): ~125 features
+- **Final count**: 100 features after SHAP-based importance selection
 - **Log returns**: All return features use log returns (`ln(P_t / P_{t-n})`) instead of simple percentage returns
 - **Constant features**: Features with zero variance (e.g., `sin_dow`, `cos_dow` for weekly data) are automatically removed
+- **Feature selection**: Final 100 features selected based on SHAP/Random Forest importance ranking (see Feature Selection section)
 
 ---
 
