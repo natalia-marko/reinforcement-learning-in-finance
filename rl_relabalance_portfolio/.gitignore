@@ -58,6 +58,3 @@ htmlcov/
 dist/
 build/
 *.egg-info/
-
-# Markdown documentation
-*.md
