@@ -9,10 +9,12 @@ import yfinance as yf
 import os
 import json
 import warnings
+import pickle
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestRegressor
 from ta.momentum import RSIIndicator, ROCIndicator, StochasticOscillator
 from ta.trend import MACD
 from ta.volatility import BollingerBands, AverageTrueRange
@@ -101,20 +103,70 @@ def fetch_macro_data(
     indicators: Optional[dict] = None,
     api_key: Optional[str] = None
 ) -> pd.DataFrame:
-    """Fetch macroeconomic indicators from FRED."""
+    """
+    Fetch macroeconomic indicators from FRED.
+
+    Enhanced indicator set captures macro regime dynamics:
+    - Inflation regime: CPI, PCE
+    - Monetary policy: Fed Funds, 10Y Treasury
+    - Credit conditions: IG/HY spreads, BAA-AAA spread
+    - Risk sentiment: VIX, equity put/call ratio
+    - Economic activity: Unemployment, ISM Manufacturing
+    - Dollar strength: Trade-weighted USD index
+    - Yield curve: 10Y-2Y spread (inversion signals recession)
+
+    Parameters:
+    -----------
+    start_date : str
+        Start date for data fetch
+    end_date : str
+        End date for data fetch
+    indicators : Optional[dict]
+        Custom indicator dict {name: FRED_series_id}. If None, uses default comprehensive set.
+    api_key : Optional[str]
+        FRED API key. If None, loads from api_keys.json
+
+    Returns:
+    --------
+    pd.DataFrame
+        Macro indicators with datetime index
+    """
 
     from fredapi import Fred
     if api_key is None:
         api_key = _load_api_key_from_file('fred')
 
-    
+
     if indicators is None:
+        # ENHANCED MACRO INDICATORS (15 high-signal series)
         indicators = {
-            'treasury_10y': 'DGS10',
-            'fed_funds_rate': 'FEDFUNDS',
-            'vix': 'VIXCLS',
-            'unemployment_rate': 'UNRATE',
-            'gdp_growth': 'A191RL1Q225SBEA',
+            # === Interest Rates & Monetary Policy ===
+            'treasury_10y': 'DGS10',           # 10Y Treasury yield (risk-free rate)
+            'treasury_2y': 'DGS2',             # 2Y Treasury yield (policy expectations)
+            'fed_funds_rate': 'FEDFUNDS',      # Fed Funds Rate (current policy)
+            'yield_curve_10y2y': 'T10Y2Y',     # 10Y-2Y spread (recession indicator)
+
+            # === Inflation ===
+            'cpi': 'CPIAUCSL',                 # CPI (headline inflation, will compute YoY)
+            'pce_core_yoy': 'PCEPILFE',        # Core PCE (Fed's preferred measure)
+
+            # === Credit & Risk Spreads ===
+            'baa_aaa_spread': 'BAA10Y',        # BAA-AAA spread (credit stress)
+            'high_yield_spread': 'BAMLH0A0HYM2', # HY OAS (credit risk premium)
+
+            # === Market Risk & Volatility ===
+            'vix': 'VIXCLS',                   # VIX (equity volatility/fear gauge)
+
+            # === Economic Activity ===
+            'unemployment_rate': 'UNRATE',      # Unemployment rate (labor market)
+            # 'gdp_growth': 'A191RL1Q225SBEA',   # REMOVED: insufficient variation (only 3 values)
+            'ism_manufacturing': 'ISRATIO',     # ISM Manufacturing PMI (activity)
+
+            # === Commodities ===
+            'oil_wti': 'DCOILWTICO',           # WTI Crude Oil (energy prices)
+
+            # === Dollar Strength ===
+            'dxy': 'DTWEXBGS',                 # Trade-weighted USD index (dollar strength)
         }
     
     try:
@@ -135,13 +187,306 @@ def fetch_macro_data(
     
     if macro_data.empty:
         return pd.DataFrame()
-    
+
     macro_data.index = pd.to_datetime(macro_data.index)
     macro_data = macro_data.sort_index()
+
+    # Compute derived indicators
+    # CPI YoY log returns (12-month inflation rate)
+    if 'cpi' in macro_data.columns:
+        macro_data['cpi_yoy'] = calculate_log_returns(macro_data['cpi'], periods=12) * 100
+        # Keep both CPI level and YoY log change
+
     # Don't resample - keep original dates and let merge_macro_data handle alignment
     # This allows proper date matching with price data dates
-    
+
     return macro_data
+
+
+def fetch_news_sentiment(
+    tickers: List[str],
+    days: int = 7,
+    api_key: Optional[str] = None
+) -> float:
+    """
+    Fetch news sentiment using NewsAPI + VADER sentiment analysis.
+
+    Requires:
+    - pip install newsapi-python nltk
+    - nltk.download('vader_lexicon')
+
+    Parameters:
+    -----------
+    tickers : List[str]
+        List of ticker symbols to search for
+    days : int
+        Number of days to look back (default: 7 for weekly)
+    api_key : Optional[str]
+        NewsAPI key (or load from api_keys.json)
+
+    Returns:
+    --------
+    float
+        Average sentiment score: -1 (bearish) to +1 (bullish)
+    """
+    try:
+        from newsapi import NewsApiClient
+        import nltk
+        from nltk.sentiment.vader import SentimentIntensityAnalyzer
+
+        # Download VADER lexicon if not already present
+        try:
+            nltk.data.find('sentiment/vader_lexicon.zip')
+        except LookupError:
+            nltk.download('vader_lexicon', quiet=True)
+
+        sia = SentimentIntensityAnalyzer()
+
+        if api_key is None:
+            api_key = _load_api_key_from_file('newsapi')
+
+        if api_key is None:
+            warnings.warn("NewsAPI key not found. Skipping news sentiment.", UserWarning)
+            return 0.0
+
+        newsapi = NewsApiClient(api_key=api_key)
+
+        articles = []
+        for ticker in tickers:
+            try:
+                res = newsapi.get_everything(
+                    q=ticker,
+                    language='en',
+                    page_size=100,
+                    sort_by='publishedAt'
+                )
+                articles.extend(res.get('articles', []))
+            except Exception as e:
+                warnings.warn(f"Failed to fetch news for {ticker}: {e}", UserWarning)
+
+        if not articles:
+            return 0.0
+
+        # Calculate VADER compound scores for article titles
+        scores = [sia.polarity_scores(a['title'])['compound'] for a in articles if a.get('title')]
+
+        return np.mean(scores) if scores else 0.0
+
+    except ImportError:
+        warnings.warn(
+            "NewsAPI or NLTK not installed. "
+            "Install with: pip install newsapi-python nltk",
+            UserWarning
+        )
+        return 0.0
+    except Exception as e:
+        warnings.warn(f"News sentiment fetch failed: {e}", UserWarning)
+        return 0.0
+
+
+def fetch_twitter_sentiment(
+    query: str,
+    days: int = 7,
+    max_tweets: int = 500
+) -> float:
+    """
+    Fetch Twitter sentiment using snscrape + VADER sentiment analysis.
+
+    Requires:
+    - pip install snscrape nltk
+
+    NOTE: Twitter API access is now restricted. Consider alternatives:
+    - Reddit API (via PRAW) for r/wallstreetbets, r/stocks sentiment
+    - StockTwits API for stock-specific social sentiment
+    - FinBERT for more accurate financial sentiment
+
+    Parameters:
+    -----------
+    query : str
+        Search query (e.g., "$AAPL OR $MSFT")
+    days : int
+        Number of days to look back
+    max_tweets : int
+        Maximum number of tweets to fetch
+
+    Returns:
+    --------
+    float
+        Average sentiment score: -1 (bearish) to +1 (bullish)
+    """
+    try:
+        import snscrape.modules.twitter as sntwitter
+        import nltk
+        from nltk.sentiment.vader import SentimentIntensityAnalyzer
+
+        # Download VADER lexicon if not already present
+        try:
+            nltk.data.find('sentiment/vader_lexicon.zip')
+        except LookupError:
+            nltk.download('vader_lexicon', quiet=True)
+
+        sia = SentimentIntensityAnalyzer()
+
+        tweets = []
+        for i, tweet in enumerate(sntwitter.TwitterSearchScraper(query).get_items()):
+            if i >= max_tweets:
+                break
+            tweets.append(tweet.content)
+
+        if not tweets:
+            return 0.0
+
+        scores = [sia.polarity_scores(t)['compound'] for t in tweets]
+        return np.mean(scores) if scores else 0.0
+
+    except ImportError:
+        warnings.warn(
+            "snscrape or NLTK not installed. "
+            "Install with: pip install snscrape nltk",
+            UserWarning
+        )
+        return 0.0
+    except Exception as e:
+        warnings.warn(f"Twitter sentiment fetch failed: {e}", UserWarning)
+        return 0.0
+
+
+def fetch_sentiment_data(
+    tickers: List[str],
+    start_date: str,
+    end_date: str,
+    source: str = 'news',  # 'news', 'twitter', or 'combined'
+    api_key: Optional[str] = None
+) -> pd.DataFrame:
+    """
+    Fetch sentiment data for tickers from various sources.
+
+    Sentiment captures market mood beyond price:
+    - News sentiment: Earnings reports, analyst upgrades, regulatory news
+    - Social sentiment: Retail trader sentiment, hype cycles, FUD
+    - Combined: Aggregated multi-source sentiment for robustness
+
+    Parameters:
+    -----------
+    tickers : List[str]
+        List of ticker symbols
+    start_date : str
+        Start date for sentiment data
+    end_date : str
+        End date for sentiment data
+    source : str
+        Sentiment source: 'news', 'twitter', or 'combined'
+    api_key : Optional[str]
+        API key for NewsAPI (if using news sentiment)
+
+    Returns:
+    --------
+    pd.DataFrame
+        Sentiment data with columns: date, ticker, news_sentiment, twitter_sentiment
+
+    Notes:
+    ------
+    - Sentiment is fetched once per date (not per ticker, as news/social covers market broadly)
+    - For ticker-specific sentiment, modify to loop over tickers
+    - Consider lagged sentiment (t-1, t-7) for predictive power
+    - Resample to weekly by taking mean sentiment over 7-day windows
+    """
+    # Generate date range
+    dates = pd.date_range(start=start_date, end=end_date, freq='W-FRI')  # Weekly on Fridays
+
+    sentiment_records = []
+
+    for date in dates:
+        record = {'date': date}
+
+        if source in ['news', 'combined']:
+            record['news_sentiment'] = fetch_news_sentiment(tickers, days=7, api_key=api_key)
+
+        if source in ['twitter', 'combined']:
+            # Create query string: "$AAPL OR $MSFT OR ..."
+            twitter_query = " OR ".join([f"${t}" for t in tickers])
+            record['twitter_sentiment'] = fetch_twitter_sentiment(twitter_query, days=7)
+
+        # Add per-ticker records (if needed for ticker-specific sentiment)
+        for ticker in tickers:
+            ticker_record = record.copy()
+            ticker_record['ticker'] = ticker
+            sentiment_records.append(ticker_record)
+
+    sentiment_df = pd.DataFrame(sentiment_records)
+    sentiment_df['date'] = pd.to_datetime(sentiment_df['date'])
+
+    # Add derived features
+    if 'news_sentiment' in sentiment_df.columns:
+        sentiment_df['news_sentiment_7d_ma'] = sentiment_df.groupby('ticker')['news_sentiment'].transform(
+            lambda x: x.rolling(window=4, min_periods=1).mean()  # 4-week MA for weekly data
+        )
+
+    if 'twitter_sentiment' in sentiment_df.columns:
+        sentiment_df['twitter_sentiment_7d_ma'] = sentiment_df.groupby('ticker')['twitter_sentiment'].transform(
+            lambda x: x.rolling(window=4, min_periods=1).mean()
+        )
+
+    return sentiment_df
+
+
+def merge_sentiment_data(
+    df: pd.DataFrame,
+    sentiment_data: pd.DataFrame,
+    date_col: str = 'date'
+) -> pd.DataFrame:
+    """
+    Merge sentiment data with price dataframe by date and ticker.
+
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Price dataframe with 'date' and 'ticker' columns
+    sentiment_data : pd.DataFrame
+        Sentiment dataframe with 'date', 'ticker', and sentiment columns
+    date_col : str
+        Date column name (default: 'date')
+
+    Returns:
+    --------
+    pd.DataFrame
+        Merged dataframe with sentiment features
+    """
+    if sentiment_data.empty:
+        warnings.warn("Sentiment data is empty, skipping merge", UserWarning)
+        return df.copy()
+
+    result = df.copy()
+
+    if date_col not in result.columns or 'ticker' not in result.columns:
+        warnings.warn(
+            f"Date column '{date_col}' or 'ticker' not found, skipping sentiment merge",
+            UserWarning
+        )
+        return result
+
+    result[date_col] = pd.to_datetime(result[date_col])
+    sentiment_data[date_col] = pd.to_datetime(sentiment_data[date_col])
+
+    # Merge on date and ticker
+    result = result.merge(
+        sentiment_data,
+        on=[date_col, 'ticker'],
+        how='left'
+    )
+
+    # Forward fill sentiment within each ticker (handles sparse data)
+    sentiment_cols = [col for col in sentiment_data.columns
+                      if col not in [date_col, 'ticker']]
+    for col in sentiment_cols:
+        if col in result.columns:
+            result[col] = result.groupby('ticker')[col].ffill()
+            # Backward fill for any remaining NaN at start
+            result[col] = result.groupby('ticker')[col].bfill()
+            # Fill any remaining NaN with neutral sentiment (0)
+            result[col] = result[col].fillna(0)
+
+    return result
 
 
 def fetch_benchmark_returns(
@@ -361,24 +706,38 @@ def calculate_momentum_features(df: pd.DataFrame) -> pd.DataFrame:
         
         # RSI at multiple periods
         for window in [7, 14, 21]:
-            rsi = RSIIndicator(close=close_series, window=window)
-            result.loc[mask, f'rsi_{window}d'] = rsi.rsi()
-        
+            if len(ticker_df) >= window + 1:
+                rsi = RSIIndicator(close=close_series, window=window)
+                result.loc[mask, f'rsi_{window}d'] = rsi.rsi()
+            else:
+                result.loc[mask, f'rsi_{window}d'] = np.nan
+
         # ROC at multiple periods
         for period in [1, 4, 13, 26]:
-            roc = ROCIndicator(close=close_series, window=period)
-            result.loc[mask, f'roc_{period}w'] = roc.roc()
-        
-        # MACD components
-        macd = MACD(close=close_series, window_slow=26, window_fast=12, window_sign=9)
-        result.loc[mask, 'macd'] = macd.macd()
-        result.loc[mask, 'macd_signal'] = macd.macd_signal()
-        result.loc[mask, 'macd_histogram'] = macd.macd() - macd.macd_signal()
-        
+            if len(ticker_df) >= period + 1:
+                roc = ROCIndicator(close=close_series, window=period)
+                result.loc[mask, f'roc_{period}w'] = roc.roc()
+            else:
+                result.loc[mask, f'roc_{period}w'] = np.nan
+
+        # MACD components - needs at least 35 data points (slow=26 + signal=9)
+        if len(ticker_df) >= 35:
+            macd = MACD(close=close_series, window_slow=26, window_fast=12, window_sign=9)
+            result.loc[mask, 'macd'] = macd.macd()
+            result.loc[mask, 'macd_signal'] = macd.macd_signal()
+            result.loc[mask, 'macd_histogram'] = macd.macd() - macd.macd_signal()
+        else:
+            result.loc[mask, 'macd'] = np.nan
+            result.loc[mask, 'macd_signal'] = np.nan
+            result.loc[mask, 'macd_histogram'] = np.nan
+
         # Stochastic Oscillator at multiple periods
         for window in [7, 14, 21]:
-            stoch = StochasticOscillator(high=high_series, low=low_series, close=close_series, window=window)
-            result.loc[mask, f'stochastic_{window}w'] = stoch.stoch()
+            if len(ticker_df) >= window + 1:
+                stoch = StochasticOscillator(high=high_series, low=low_series, close=close_series, window=window)
+                result.loc[mask, f'stochastic_{window}w'] = stoch.stoch()
+            else:
+                result.loc[mask, f'stochastic_{window}w'] = np.nan
         
         # Price to SMA/EMA ratios
         for period in [4, 8, 12, 20, 26]:
@@ -426,28 +785,44 @@ def calculate_volatility_features(df: pd.DataFrame) -> pd.DataFrame:
                 lambda x: np.sum(x**2) * 52 / len(x), raw=False
             ))
             result.loc[mask, f'realized_volatility_{period}w'] = realized_vol
-        
-        atr = AverageTrueRange(high=high_series, low=low_series, close=close_series, window=14)
-        result.loc[mask, 'atr_14d'] = atr.average_true_range() / close_series
-        
+
+        # ATR - only calculate if we have enough data
+        if len(ticker_df) >= 15:  # Need at least window + 1 for ATR
+            atr = AverageTrueRange(high=high_series, low=low_series, close=close_series, window=14)
+            result.loc[mask, 'atr_14d'] = atr.average_true_range() / close_series
+        else:
+            result.loc[mask, 'atr_14d'] = np.nan
+
         # ATR at multiple periods
         for period in [7, 14, 26]:
-            atr_multi = AverageTrueRange(high=high_series, low=low_series, close=close_series, window=period)
-            result.loc[mask, f'atr_{period}d'] = atr_multi.average_true_range() / close_series
-        
-        bb = BollingerBands(close=close_series, window=20, window_dev=2)
-        bb_high = bb.bollinger_hband()
-        bb_low = bb.bollinger_lband()
-        result.loc[mask, 'bb_width'] = (bb_high - bb_low) / close_series
-        result.loc[mask, 'bb_position'] = (close_series - bb_low) / (bb_high - bb_low + 1e-10)
-        
+            if len(ticker_df) >= period + 1:
+                atr_multi = AverageTrueRange(high=high_series, low=low_series, close=close_series, window=period)
+                result.loc[mask, f'atr_{period}d'] = atr_multi.average_true_range() / close_series
+            else:
+                result.loc[mask, f'atr_{period}d'] = np.nan
+
+        # Bollinger Bands - only calculate if we have enough data
+        if len(ticker_df) >= 20:
+            bb = BollingerBands(close=close_series, window=20, window_dev=2)
+            bb_high = bb.bollinger_hband()
+            bb_low = bb.bollinger_lband()
+            result.loc[mask, 'bb_width'] = (bb_high - bb_low) / close_series
+            result.loc[mask, 'bb_position'] = (close_series - bb_low) / (bb_high - bb_low + 1e-10)
+        else:
+            result.loc[mask, 'bb_width'] = np.nan
+            result.loc[mask, 'bb_position'] = np.nan
+
         # Bollinger Bands at multiple periods
         for period in [13, 20, 26]:
-            bb_multi = BollingerBands(close=close_series, window=period, window_dev=2)
-            bb_high_multi = bb_multi.bollinger_hband()
-            bb_low_multi = bb_multi.bollinger_lband()
-            result.loc[mask, f'bb_width_{period}w'] = (bb_high_multi - bb_low_multi) / close_series
-            result.loc[mask, f'bb_position_{period}w'] = (close_series - bb_low_multi) / (bb_high_multi - bb_low_multi + 1e-10)
+            if len(ticker_df) >= period:
+                bb_multi = BollingerBands(close=close_series, window=period, window_dev=2)
+                bb_high_multi = bb_multi.bollinger_hband()
+                bb_low_multi = bb_multi.bollinger_lband()
+                result.loc[mask, f'bb_width_{period}w'] = (bb_high_multi - bb_low_multi) / close_series
+                result.loc[mask, f'bb_position_{period}w'] = (close_series - bb_low_multi) / (bb_high_multi - bb_low_multi + 1e-10)
+            else:
+                result.loc[mask, f'bb_width_{period}w'] = np.nan
+                result.loc[mask, f'bb_position_{period}w'] = np.nan
         
         for period in [4, 13, 26]:
             # Calculate directional volatilities with fallback to total volatility
@@ -749,17 +1124,129 @@ def calculate_calendar_features(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+def calculate_regime_and_concentration_features(
+    df: pd.DataFrame,
+    benchmark_returns: Optional[pd.Series] = None
+) -> pd.DataFrame:
+    """Calculate regime indicators, relative momentum, and market concentration features.
+    
+    Features:
+    - bull_market: (vix < 20) & (returns_52w > 0)
+    - bear_market: (vix > 30) | (returns_52w < -0.1)
+    - relative_momentum: asset_return - benchmark_return
+    - market_concentration: Herfindahl index of market cap weights (using price as proxy)
+    
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Dataframe with price data and macro indicators
+    benchmark_returns : Optional[pd.Series]
+        Benchmark returns for relative momentum calculation
+        
+    Returns:
+    --------
+    pd.DataFrame
+        Dataframe with regime and concentration features added
+    """
+    result = df.copy()
+    
+    # Calculate 52-week returns for each ticker
+    for ticker in df['ticker'].unique():
+        mask = df['ticker'] == ticker
+        ticker_df = df[mask].copy().sort_values('date')
+        
+        close_series = pd.Series(ticker_df['close'].values, index=ticker_df.index)
+        returns_52w = calculate_log_returns(close_series, periods=52)
+        result.loc[mask, 'returns_52w'] = returns_52w
+        
+        # Calculate asset return (1-week log return)
+        asset_return = calculate_log_returns(close_series, periods=1)
+        
+        # Relative momentum: asset_return - benchmark_return
+        if benchmark_returns is not None:
+            dates = pd.to_datetime(ticker_df['date'].values)
+            asset_return_with_dates = pd.Series(asset_return.values, index=dates)
+            aligned_bench = benchmark_returns.reindex(dates, method='ffill')
+            result.loc[mask, 'relative_momentum'] = (asset_return_with_dates - aligned_bench).values
+        else:
+            result.loc[mask, 'relative_momentum'] = np.nan
+    
+    # Regime indicators (using VIX if available)
+    if 'vix' in result.columns:
+        # Bull market: low VIX and positive 52-week returns
+        result['bull_market'] = ((result['vix'] < 20) & (result['returns_52w'] > 0)).astype(float)
+        
+        # Bear market: high VIX or significant negative 52-week returns
+        result['bear_market'] = ((result['vix'] > 30) | (result['returns_52w'] < -0.1)).astype(float)
+    else:
+        # If VIX not available, use returns_52w only
+        result['bull_market'] = (result['returns_52w'] > 0).astype(float)
+        result['bear_market'] = (result['returns_52w'] < -0.1).astype(float)
+    
+    # Market concentration: Herfindahl index using price-weighted market share
+    # Since we don't have market cap data, we use price as a proxy
+    # Calculate concentration per date across all tickers
+    result = result.sort_values(['date', 'ticker'])
+    
+    # Group by date and calculate Herfindahl index
+    for date in result['date'].unique():
+        date_mask = result['date'] == date
+        date_data = result[date_mask]
+        
+        if len(date_data) > 1:
+            # Use price as proxy for market cap
+            prices = date_data['close'].values
+            total_price = prices.sum()
+            
+            if total_price > 0:
+                # Market share weights
+                weights = prices / total_price
+                # Herfindahl index: sum of squared weights
+                herfindahl = np.sum(weights ** 2)
+                result.loc[date_mask, 'market_concentration'] = herfindahl
+            else:
+                result.loc[date_mask, 'market_concentration'] = np.nan
+        else:
+            result.loc[date_mask, 'market_concentration'] = np.nan
+    
+    return result
+
+
 def engineer_all_features(
     df: pd.DataFrame,
     benchmark_returns: Optional[pd.Series] = None,
-    macro_data: Optional[pd.DataFrame] = None
+    macro_data: Optional[pd.DataFrame] = None,
+    sentiment_data: Optional[pd.DataFrame] = None
 ) -> pd.DataFrame:
-    """Calculate all feature categories."""
+    """
+    Calculate all feature categories.
+
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Price dataframe with OHLCV data
+    benchmark_returns : Optional[pd.Series]
+        Benchmark returns for correlation/beta calculations
+    macro_data : Optional[pd.DataFrame]
+        Macroeconomic indicators from FRED
+    sentiment_data : Optional[pd.DataFrame]
+        Sentiment data (news, social media)
+
+    Returns:
+    --------
+    pd.DataFrame
+        Dataframe with all engineered features
+    """
     result = df.copy()
-    
+
+    # Merge external data sources
     if macro_data is not None and not macro_data.empty:
         result = merge_macro_data(result, macro_data)
-    
+
+    if sentiment_data is not None and not sentiment_data.empty:
+        result = merge_sentiment_data(result, sentiment_data)
+
+    # Calculate price-based features
     result = calculate_momentum_features(result)
     result = calculate_volatility_features(result)
     result = calculate_volume_features(result)
@@ -768,6 +1255,9 @@ def engineer_all_features(
     result = calculate_statistical_features(result)
     result = calculate_calendar_features(result)
     
+    # Calculate regime and concentration features (requires macro data and benchmark returns)
+    result = calculate_regime_and_concentration_features(result, benchmark_returns)
+
     return result
 
 
@@ -816,24 +1306,58 @@ def remove_highly_correlated_features(
     feature_cols: List[str],
     threshold: float = 0.95
 ) -> Tuple[pd.DataFrame, List[str]]:
-    """Remove highly correlated features."""
+    """
+    Remove highly correlated features by keeping the feature with higher variance.
+
+    For each pair of features with |correlation| > threshold, removes the feature
+    with lower variance (less information content).
+    """
     result = df.copy()
     available_cols = [col for col in feature_cols if col in result.columns]
-    
+
     if len(available_cols) < 2:
         return result, []
-    
+
     corr_matrix = result[available_cols].corr().abs()
-    
-    upper_triangle = corr_matrix.where(
-        np.triu(np.ones(corr_matrix.shape), k=1).astype(bool)
-    )
-    
-    to_remove = [column for column in upper_triangle.columns if any(upper_triangle[column] > threshold)]
-    
-    result = result.drop(columns=to_remove)
-    
-    return result, to_remove
+
+    # Find all correlated pairs
+    correlated_pairs = []
+    for i in range(len(corr_matrix.columns)):
+        for j in range(i+1, len(corr_matrix.columns)):
+            if corr_matrix.iloc[i, j] > threshold:
+                correlated_pairs.append((
+                    corr_matrix.columns[i],
+                    corr_matrix.columns[j],
+                    corr_matrix.iloc[i, j]
+                ))
+
+    # For each pair, keep the feature with higher variance
+    to_remove = set()
+    for feat1, feat2, corr_val in correlated_pairs:
+        # Skip if either feature already marked for removal
+        if feat1 in to_remove or feat2 in to_remove:
+            continue
+
+        var1 = result[feat1].var()
+        var2 = result[feat2].var()
+
+        # Remove the feature with lower variance
+        if var1 < var2:
+            to_remove.add(feat1)
+        else:
+            to_remove.add(feat2)
+
+    to_remove_list = list(to_remove)
+
+    if to_remove_list:
+        result = result.drop(columns=to_remove_list)
+        warnings.warn(
+            f"Removed {len(to_remove_list)} highly correlated features (threshold={threshold}): "
+            f"{to_remove_list[:10]}{'...' if len(to_remove_list) > 10 else ''}",
+            UserWarning
+        )
+
+    return result, to_remove_list
 
 def split_data(
     df: pd.DataFrame,
@@ -904,63 +1428,652 @@ def preprocess_pipeline(
     corr_threshold: float = 0.95,
     date_col: str = 'date'
 ) -> Dict[str, any]:
-    """Complete preprocessing pipeline: outlier removal, correlation filtering, split, normalization."""
+    """
+    Complete preprocessing pipeline: LEAK-PROOF version.
+
+    CRITICAL ORDER (prevents data leakage):
+    1. Fill NaN values
+    2. SPLIT DATA FIRST (chronological split)
+    3. Remove constant features (fit on train, apply to test)
+    4. Remove outliers (fit percentiles on train, clip test using train percentiles)
+    5. Remove correlations (fit on train, remove same features from test)
+    6. Normalize (fit scaler on train, transform test)
+
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Input dataframe with features
+    feature_cols : List[str]
+        List of feature column names
+    train_ratio : float
+        Ratio for train/test split (default: 0.8)
+    clip_percentiles : Tuple[float, float]
+        Percentiles for outlier clipping (default: (0.01, 0.99))
+    corr_threshold : float
+        Correlation threshold for feature removal (default: 0.95)
+    date_col : str
+        Date column name for chronological split (default: 'date')
+
+    Returns:
+    --------
+    Dict with keys: 'train', 'test', 'scaler', 'removed_features'
+    """
     if len(df) == 0:
         raise ValueError("Input dataframe is empty.")
-    
+
     result = df.copy()
-    
-    # Fill remaining NaN values in feature columns with 0 before preprocessing
+
+    # Step 1: Fill remaining NaN values in feature columns with 0
     available_feature_cols = [col for col in feature_cols if col in result.columns]
     if len(available_feature_cols) > 0:
         result[available_feature_cols] = result[available_feature_cols].fillna(0)
-    
-    # Remove constant features (zero variance) before other preprocessing
-    result, constant_features_removed = remove_constant_features(result, feature_cols)
-    
-    result = remove_outliers(result, feature_cols, clip_percentiles)
-    
-    result, removed_features = remove_highly_correlated_features(
-        result, feature_cols, corr_threshold
-    )
 
-    
+    # Step 2: SPLIT DATA FIRST (prevents leakage)
     splits = split_data(result, train_ratio, date_col)
-    
-    if len(splits['train']) == 0:
+    train_df = splits['train'].copy()
+    test_df = splits['test'].copy()
+
+    if len(train_df) == 0:
         raise ValueError(
-            f"Training set is empty after preprocessing. "
-            f"Input had {len(df)} rows. Check data filtering steps."
+            f"Training set is empty after split. "
+            f"Input had {len(df)} rows. Check data."
         )
-    
-    if len(splits['test']) == 0:
+
+    if len(test_df) == 0:
         raise ValueError(
-            f"Test set is empty after preprocessing. "
-            f"Input had {len(df)} rows. Check data filtering steps."
+            f"Test set is empty after split. "
+            f"Input had {len(df)} rows. Check data."
         )
-    
+
+    # Step 3: Remove constant features (fit on train only)
+    train_df, constant_features_removed = remove_constant_features(train_df, feature_cols)
+    # Apply same removal to test
+    test_df = test_df.drop(columns=constant_features_removed, errors='ignore')
+
+    # Step 4: Remove outliers (fit percentiles on train only)
+    train_percentiles = {}
+    for col in feature_cols:
+        if col in train_df.columns:
+            lower = train_df[col].quantile(clip_percentiles[0])
+            upper = train_df[col].quantile(clip_percentiles[1])
+            train_percentiles[col] = (lower, upper)
+            # Clip train
+            train_df[col] = train_df[col].clip(lower=lower, upper=upper)
+            # Clip test using TRAIN percentiles (no leakage)
+            if col in test_df.columns:
+                test_df[col] = test_df[col].clip(lower=lower, upper=upper)
+
+    # Step 5: Remove highly correlated features (fit on train only)
+    train_df, removed_features = remove_highly_correlated_features(
+        train_df, feature_cols, corr_threshold
+    )
+    # Apply same removal to test
+    test_df = test_df.drop(columns=removed_features, errors='ignore')
+
+    # Step 6: Get final feature columns
     non_feature_cols = ['date', 'ticker', 'open', 'high', 'low', 'close', 'volume']
     updated_feature_cols = [
-        col for col in splits['train'].columns 
+        col for col in train_df.columns
         if col not in non_feature_cols
     ]
-    
+
     if len(updated_feature_cols) == 0:
         raise ValueError(
             f"No feature columns remaining after preprocessing. "
             f"Original features: {len(feature_cols)}, "
-            f"Removed by correlation: {len(removed_features)}. "
-            f"Available columns: {list(splits['train'].columns)}"
+            f"Removed (constant): {len(constant_features_removed)}, "
+            f"Removed (correlation): {len(removed_features)}. "
+            f"Available columns: {list(train_df.columns)}"
         )
-    
+
+    # Step 7: Normalize (fit on train, transform test)
     train_norm, test_norm, scaler = normalize_features(
-        splits['train'], splits['test'], updated_feature_cols
+        train_df, test_df, updated_feature_cols
     )
-    
+
     return {
         'train': train_norm,
         'test': test_norm,
         'scaler': scaler,
         'removed_features': removed_features + constant_features_removed,
+        'train_percentiles': train_percentiles,  # Store for future use
     }
+
+
+# ============================================================================
+# COMPLETE INTEGRATED PIPELINE (LEAK-PROOF)
+# ============================================================================
+
+def complete_data_pipeline(
+    tickers: List[str],
+    start_date: str,
+    end_date: str,
+    interval: str = '1wk',
+    train_ratio: float = 0.8,
+    include_macro: bool = True,
+    include_sentiment: bool = False,
+    sentiment_source: str = 'news',
+    clip_percentiles: Tuple[float, float] = (0.01, 0.99),
+    corr_threshold: float = 0.95,
+    fred_api_key: Optional[str] = None,
+    newsapi_key: Optional[str] = None
+) -> Dict[str, any]:
+    """
+    Complete leak-proof data preparation pipeline.
+
+    CRITICAL ORDER (prevents data leakage):
+    1. Fetch raw price data
+    2. SPLIT DATA FIRST (chronological split)
+    3. Engineer features on train and test SEPARATELY
+    4. Merge macro data (same data for both, but no leakage)
+    5. Merge sentiment data (optional)
+    6. Preprocess: outliers, correlations, normalization (fit on train, apply to test)
+
+    Parameters:
+    -----------
+    tickers : List[str]
+        List of ticker symbols to fetch
+    start_date : str
+        Start date for data (YYYY-MM-DD)
+    end_date : str
+        End date for data (YYYY-MM-DD)
+    interval : str
+        Data frequency: '1d', '1wk', '1mo' (default: '1wk')
+    train_ratio : float
+        Train/test split ratio (default: 0.8)
+    include_macro : bool
+        Whether to include macro indicators (default: True)
+    include_sentiment : bool
+        Whether to include sentiment data (default: False)
+    sentiment_source : str
+        Sentiment source: 'news', 'twitter', or 'combined' (default: 'news')
+    clip_percentiles : Tuple[float, float]
+        Percentiles for outlier clipping (default: (0.01, 0.99))
+    corr_threshold : float
+        Correlation threshold for feature removal (default: 0.95)
+    fred_api_key : Optional[str]
+        FRED API key (if None, loads from api_keys.json)
+    newsapi_key : Optional[str]
+        NewsAPI key (if None, loads from api_keys.json)
+
+    Returns:
+    --------
+    Dict with keys:
+        - 'train': Training dataframe (normalized)
+        - 'test': Test dataframe (normalized)
+        - 'scaler': StandardScaler fitted on training data
+        - 'removed_features': List of removed feature names
+        - 'metadata': Dict with pipeline metadata
+
+    Example Usage:
+    --------------
+    ```python
+    result = complete_data_pipeline(
+        tickers=['AAPL', 'MSFT', 'GOOGL'],
+        start_date='2020-01-01',
+        end_date='2025-01-01',
+        include_macro=True,
+        include_sentiment=True,
+        sentiment_source='combined'
+    )
+
+    train_df = result['train']
+    test_df = result['test']
+    scaler = result['scaler']
+    ```
+    """
+    print("=" * 80)
+    print("LEAK-PROOF DATA PREPARATION PIPELINE")
+    print("=" * 80)
+
+    # Step 1: Fetch raw price data
+    print("\n[1/7] Fetching price data...")
+    price_data = fetch_price_data(
+        tickers=tickers,
+        start_date=start_date,
+        end_date=end_date,
+        interval=interval
+    )
+    price_df = prepare_price_dataframe(price_data)
+    print(f"  ✓ Fetched {len(price_df)} rows for {len(tickers)} tickers")
+
+    # Step 2: SPLIT DATA FIRST (prevents leakage)
+    print("\n[2/7] Splitting data (chronological)...")
+    splits = split_data(price_df, train_ratio=train_ratio)
+    train_prices = splits['train'].copy()
+    test_prices = splits['test'].copy()
+    print(f"  ✓ Train: {len(train_prices)} rows ({train_prices['date'].min()} to {train_prices['date'].max()})")
+    print(f"  ✓ Test:  {len(test_prices)} rows ({test_prices['date'].min()} to {test_prices['date'].max()})")
+
+    # Step 3: Fetch benchmark returns
+    print("\n[3/7] Fetching benchmark returns (QQQ)...")
+    try:
+        benchmark_returns = fetch_benchmark_returns(
+            ticker='QQQ',
+            start_date=start_date,
+            end_date=end_date,
+            interval=interval
+        )
+        print(f"  ✓ Fetched benchmark returns")
+    except Exception as e:
+        warnings.warn(f"Failed to fetch benchmark returns: {e}", UserWarning)
+        benchmark_returns = None
+
+    # Step 4: Fetch macro data (same for train and test, no leakage)
+    macro_data = None
+    if include_macro:
+        print("\n[4/7] Fetching macro indicators from FRED...")
+        try:
+            macro_data = fetch_macro_data(
+                start_date=start_date,
+                end_date=end_date,
+                api_key=fred_api_key
+            )
+            if not macro_data.empty:
+                print(f"  ✓ Fetched {len(macro_data.columns)} macro indicators")
+            else:
+                print("  ⚠ No macro data fetched (check FRED API key)")
+        except Exception as e:
+            warnings.warn(f"Failed to fetch macro data: {e}", UserWarning)
+            print("  ⚠ Macro data fetch failed")
+    else:
+        print("\n[4/7] Skipping macro data (include_macro=False)")
+
+    # Step 5: Fetch sentiment data (optional)
+    sentiment_data = None
+    if include_sentiment:
+        print(f"\n[5/7] Fetching sentiment data (source: {sentiment_source})...")
+        try:
+            sentiment_data = fetch_sentiment_data(
+                tickers=tickers,
+                start_date=start_date,
+                end_date=end_date,
+                source=sentiment_source,
+                api_key=newsapi_key
+            )
+            if not sentiment_data.empty:
+                print(f"  ✓ Fetched sentiment data")
+            else:
+                print("  ⚠ Sentiment data empty")
+        except Exception as e:
+            warnings.warn(f"Failed to fetch sentiment data: {e}", UserWarning)
+            print("  ⚠ Sentiment fetch failed")
+    else:
+        print("\n[5/7] Skipping sentiment data (include_sentiment=False)")
+
+    # Step 6: Engineer features (separately for train and test)
+    print("\n[6/7] Engineering features...")
+    print("  → Training set...")
+    train_featured = engineer_all_features(
+        train_prices,
+        benchmark_returns=benchmark_returns,
+        macro_data=macro_data,
+        sentiment_data=sentiment_data
+    )
+    print("  → Test set...")
+    test_featured = engineer_all_features(
+        test_prices,
+        benchmark_returns=benchmark_returns,
+        macro_data=macro_data,
+        sentiment_data=sentiment_data
+    )
+    print(f"  ✓ Engineered {len(train_featured.columns)} columns")
+
+    # Step 7: Preprocess (fit on train, apply to test)
+    print("\n[7/7] Preprocessing (outliers, correlations, normalization)...")
+    non_feature_cols = ['date', 'ticker', 'open', 'high', 'low', 'close', 'volume']
+    feature_cols = [col for col in train_featured.columns if col not in non_feature_cols]
+
+    # Combine train and test for preprocessing pipeline (it will split internally)
+    combined = pd.concat([train_featured, test_featured], ignore_index=True)
+
+    preprocessed = preprocess_pipeline(
+        df=combined,
+        feature_cols=feature_cols,
+        train_ratio=len(train_featured) / len(combined),  # Maintain exact split
+        clip_percentiles=clip_percentiles,
+        corr_threshold=corr_threshold,
+        date_col='date'
+    )
+
+    train_final = preprocessed['train']
+    test_final = preprocessed['test']
+    scaler = preprocessed['scaler']
+    removed_features = preprocessed['removed_features']
+
+    final_feature_cols = [col for col in train_final.columns if col not in non_feature_cols]
+
+    print(f"  ✓ Original features: {len(feature_cols)}")
+    print(f"  ✓ Removed features: {len(removed_features)}")
+    print(f"  ✓ Final features: {len(final_feature_cols)}")
+
+    # Metadata
+    metadata = {
+        'tickers': tickers,
+        'start_date': start_date,
+        'end_date': end_date,
+        'interval': interval,
+        'train_ratio': train_ratio,
+        'train_start': train_final['date'].min().isoformat(),
+        'train_end': train_final['date'].max().isoformat(),
+        'test_start': test_final['date'].min().isoformat(),
+        'test_end': test_final['date'].max().isoformat(),
+        'n_train_samples': len(train_final),
+        'n_test_samples': len(test_final),
+        'n_features': len(final_feature_cols),
+        'feature_cols': final_feature_cols,
+        'removed_features': removed_features,
+        'include_macro': include_macro,
+        'include_sentiment': include_sentiment,
+        'sentiment_source': sentiment_source if include_sentiment else None,
+    }
+
+    print("\n" + "=" * 80)
+    print("✓ PIPELINE COMPLETE")
+    print("=" * 80)
+    print(f"Train samples: {len(train_final)}")
+    print(f"Test samples:  {len(test_final)}")
+    print(f"Features:      {len(final_feature_cols)}")
+    print("=" * 80 + "\n")
+
+    return {
+        'train': train_final,
+        'test': test_final,
+        'scaler': scaler,
+        'removed_features': removed_features,
+        'metadata': metadata,
+        'train_percentiles': preprocessed.get('train_percentiles'),
+    }
+
+
+# ============================================================================
+# DATA VERIFICATION AND VISUALIZATION FUNCTIONS
+# ============================================================================
+
+def verify_data_quality(
+    train_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    feature_cols: List[str]
+) -> None:
+    """
+    Verify data quality and check for common issues.
+    
+    Parameters:
+    -----------
+    train_df : pd.DataFrame
+        Training dataframe
+    test_df : pd.DataFrame
+        Test dataframe
+    feature_cols : List[str]
+        List of feature column names
+    """
+    print("=" * 80)
+    print("VERIFICATION TESTS")
+    print("=" * 80)
+    
+    # Test 1: No temporal overlap (data leakage check)
+    print("\n[Test 1] Checking for data leakage (temporal overlap)...")
+    train_end = pd.to_datetime(train_df['date'].max())
+    test_start = pd.to_datetime(test_df['date'].min())
+    
+    if train_end < test_start:
+        print(f"  ✓ PASS: No overlap")
+        print(f"    Train ends:  {train_end.date()}")
+        print(f"    Test starts: {test_start.date()}")
+        print(f"    Gap:         {(test_start - train_end).days} days")
+    else:
+        print(f"  ✗ FAIL: Overlap detected!")
+        print(f"    Train ends:  {train_end.date()}")
+        print(f"    Test starts: {test_start.date()}")
+    
+    # Test 2: Feature consistency
+    print("\n[Test 2] Checking feature consistency...")
+    train_cols = set(train_df.columns)
+    test_cols = set(test_df.columns)
+    
+    if train_cols == test_cols:
+        print(f"  ✓ PASS: Train and test have same {len(train_cols)} columns")
+    else:
+        print(f"  ✗ FAIL: Column mismatch")
+        print(f"    Train only: {train_cols - test_cols}")
+        print(f"    Test only:  {test_cols - train_cols}")
+    
+    # Test 3: Normalization
+    print("\n[Test 3] Checking normalization...")
+    train_means = train_df[feature_cols].mean().mean()
+    train_stds = train_df[feature_cols].std().mean()
+    
+    print(f"  Train mean: {train_means:.4f} (target: ~0.00)")
+    print(f"  Train std:  {train_stds:.4f} (target: ~1.00)")
+    
+    if abs(train_means) < 0.1 and abs(train_stds - 1.0) < 0.2:
+        print("  ✓ PASS: Training set properly normalized")
+    else:
+        print("  ⚠ WARNING: Normalization may be off")
+    
+    # Test 4: Macro indicators
+    print("\n[Test 4] Checking macro indicators...")
+    macro_keywords = ['treasury', 'fed_funds', 'vix', 'cpi', 'unemployment',
+                      'ism', 'yield_curve', 'dxy', 'oil', 'spread', 'pce', 'baa']
+    macro_cols = [c for c in train_df.columns if any(kw in c.lower() for kw in macro_keywords)]
+    
+    print(f"  Found {len(macro_cols)} macro indicator columns:")
+    for col in sorted(macro_cols)[:10]:
+        print(f"    - {col}")
+    if len(macro_cols) > 10:
+        print(f"    ... and {len(macro_cols) - 10} more")
+    
+    if len(macro_cols) >= 10:
+        print("  ✓ PASS: Comprehensive macro coverage")
+    else:
+        print(f"  ⚠ WARNING: Only {len(macro_cols)} macro features (expected 10+)")
+    
+    # Test 5: Data quality
+    print("\n[Test 5] Checking data quality...")
+    train_na_pct = train_df[feature_cols].isna().sum().sum() / (len(train_df) * len(feature_cols)) * 100
+    test_na_pct = test_df[feature_cols].isna().sum().sum() / (len(test_df) * len(feature_cols)) * 100
+    
+    print(f"  Train NaN: {train_na_pct:.2f}%")
+    print(f"  Test NaN:  {test_na_pct:.2f}%")
+    
+    if train_na_pct < 1.0 and test_na_pct < 1.0:
+        print("  ✓ PASS: Low missing data")
+    else:
+        print("  ⚠ WARNING: High missing data percentage")
+
+
+# Plotting functions moved to viz.py
+# Import from viz module: from viz import plot_price_data
+
+
+def categorize_features(
+    feature_cols: List[str],
+    macro_cols: List[str]
+) -> Dict[str, List[str]]:
+    """
+    Categorize features into groups.
+    
+    Parameters:
+    -----------
+    feature_cols : List[str]
+        List of all feature column names
+    macro_cols : List[str]
+        List of macro indicator column names
+    
+    Returns:
+    --------
+    Dict[str, List[str]]
+        Dictionary mapping category names to feature lists
+    """
+    feature_categories = {
+        'Momentum': [f for f in feature_cols if any(x in f.lower() for x in ['return', 'roc', 'momentum', 'rsi', 'macd', 'stochastic'])],
+        'Volatility': [f for f in feature_cols if 'volatility' in f.lower() or 'atr' in f.lower() or 'parkinson' in f.lower()],
+        'Volume': [f for f in feature_cols if 'volume' in f.lower() or 'obv' in f.lower() or 'mfi' in f.lower() or 'chaikin' in f.lower()],
+        'Risk-Adjusted': [f for f in feature_cols if any(x in f.lower() for x in ['sharpe', 'sortino', 'calmar'])],
+        'Drawdown': [f for f in feature_cols if any(x in f.lower() for x in ['drawdown', 'recovery', 'mae', 'mfe'])],
+        'Technical': [f for f in feature_cols if any(x in f.lower() for x in ['bb_', 'sma', 'ema', 'vwap', 'price_to', 'price_position'])],
+        'Macro': macro_cols,
+        'Statistical': [f for f in feature_cols if any(x in f.lower() for x in ['skew', 'kurt', 'autocorr'])],
+        'Calendar': [f for f in feature_cols if any(x in f.lower() for x in ['sin_', 'cos_'])]
+    }
+    
+    # Remove duplicates and categorize remaining as 'Other'
+    all_categorized = set()
+    for cat_features in feature_categories.values():
+        all_categorized.update(cat_features)
+    feature_categories['Other'] = [f for f in feature_cols if f not in all_categorized]
+    
+    return feature_categories
+
+
+def print_feature_summary(
+    feature_cols: List[str],
+    feature_categories: Dict[str, List[str]]
+) -> None:
+    """
+    Print feature summary statistics.
+    
+    Parameters:
+    -----------
+    feature_cols : List[str]
+        List of all feature column names
+    feature_categories : Dict[str, List[str]]
+        Dictionary mapping category names to feature lists
+    """
+    print("=" * 80)
+    print("FEATURE SUMMARY")
+    print("=" * 80)
+    print(f"\nTotal features: {len(feature_cols)}\n")
+    
+    for category, features in sorted(feature_categories.items(), key=lambda x: -len(x[1])):
+        if features:
+            print(f"{category:20s}: {len(features):3d} features")
+    
+    # Show sample features from top categories
+    print("\n" + "=" * 80)
+    print("SAMPLE FEATURES BY CATEGORY")
+    print("=" * 80)
+    
+    for category, features in sorted(feature_categories.items(), key=lambda x: -len(x[1]))[:5]:
+        if features:
+            print(f"\n{category} (showing up to 5):")
+            for feat in features[:5]:
+                print(f"  - {feat}")
+
+
+def verify_regime_features(
+    train_df: pd.DataFrame,
+    test_df: pd.DataFrame
+) -> None:
+    """
+    Verify regime and concentration features (without plotting).
+    For plotting, use viz.plot_regime_features()
+    
+    Parameters:
+    -----------
+    train_df : pd.DataFrame
+        Training dataframe
+    test_df : pd.DataFrame
+        Test dataframe
+    """
+    regime_features = ['bull_market', 'bear_market', 'relative_momentum', 'market_concentration', 'returns_52w']
+    available_regime_features = [f for f in regime_features if f in train_df.columns]
+    
+    print("=" * 80)
+    print("REGIME AND CONCENTRATION FEATURES VERIFICATION")
+    print("=" * 80)
+    
+    if available_regime_features:
+        print(f"\n✓ Found {len(available_regime_features)} regime/concentration features:")
+        for feat in available_regime_features:
+            if feat in train_df.columns:
+                train_vals = train_df[feat].dropna()
+                print(f"\n  {feat}:")
+                print(f"    Train: mean={train_vals.mean():.4f}, std={train_vals.std():.4f}, "
+                      f"min={train_vals.min():.4f}, max={train_vals.max():.4f}")
+                if feat in test_df.columns:
+                    test_vals = test_df[feat].dropna()
+                    print(f"    Test:  mean={test_vals.mean():.4f}, std={test_vals.std():.4f}, "
+                          f"min={test_vals.min():.4f}, max={test_vals.max():.4f}")
+        
+        print("\n" + "=" * 80)
+        print("✓ Regime and concentration features successfully added to pipeline")
+        print("=" * 80)
+    else:
+        print("\n⚠ WARNING: Regime features not found. They should be automatically")
+        print("  included when using complete_data_pipeline() with macro data.")
+
+
+# Plotting functions moved to viz.py
+# Import from viz module: from viz import plot_feature_distributions
+
+
+# Feature importance analysis moved to viz.py
+# Import from viz module: from viz import analyze_feature_importance
+
+
+def save_processed_data(
+    train_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    scaler: StandardScaler,
+    metadata: Dict,
+    processed_data_dir: Path,
+    results_dir: Path
+) -> None:
+    """
+    Save processed datasets, scaler, and metadata.
+    
+    Parameters:
+    -----------
+    train_df : pd.DataFrame
+        Training dataframe
+    test_df : pd.DataFrame
+        Test dataframe
+    scaler : StandardScaler
+        Fitted scaler
+    metadata : Dict
+        Metadata dictionary
+    processed_data_dir : Path
+        Directory to save processed data
+    results_dir : Path
+        Directory where visualizations were saved
+    """
+    print("=" * 80)
+    print("SAVING RESULTS")
+    print("=" * 80)
+    
+    # Save datasets
+    train_df.to_parquet(processed_data_dir / 'train.parquet', index=False)
+    test_df.to_parquet(processed_data_dir / 'test.parquet', index=False)
+    
+    # Save scaler
+    with open(processed_data_dir / 'scaler.pkl', 'wb') as f:
+        pickle.dump(scaler, f)
+    
+    # Save metadata
+    with open(processed_data_dir / 'metadata.json', 'w') as f:
+        json.dump(metadata, f, indent=2, default=str)
+    
+    print(f"\n✓ Saved to: {processed_data_dir}")
+    print(f"  - train.parquet ({len(train_df)} samples)")
+    print(f"  - test.parquet ({len(test_df)} samples)")
+    print(f"  - scaler.pkl")
+    print(f"  - metadata.json ({len(metadata['feature_cols'])} features)")
+    
+    print("\n" + "=" * 80)
+    print("PIPELINE COMPLETE")
+    print("=" * 80)
+    print("\nYou can now use these files for RL training:")
+    print(f"  1. Load data: pd.read_parquet('{processed_data_dir}/train.parquet')")
+    print(f"  2. Load scaler: pickle.load(open('{processed_data_dir}/scaler.pkl', 'rb'))")
+    print(f"  3. Load metadata: json.load(open('{processed_data_dir}/metadata.json'))")
+    print(f"\nVisualization saved to: {results_dir}")
+    print("  - price_data_overview.png")
+    print("  - feature_distributions.png")
+    print("  - feature_importance.png")
+    print("  - regime_features.png")
+
+
+# Plotting functions moved to viz.py
+# Import from viz module: from viz import plot_validation_test_gap
 

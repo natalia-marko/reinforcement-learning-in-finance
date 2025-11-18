@@ -1,0 +1,11 @@
+COMPREHENSIVE MODEL TRAINING SUMMARY
+====================================================================================================
+
+Training Date: 2025-11-18 18:42:21
+Total Models Trained: 8
+Total Results: 24
+Walk-Forward Folds: 3
+
+Best Model: momentum
+Best Sharpe: 1.013
+Best Return: 202.01%
