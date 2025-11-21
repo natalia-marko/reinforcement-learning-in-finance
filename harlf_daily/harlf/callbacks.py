@@ -1,0 +1,599 @@
+"""
+Custom Callbacks for RL Training with Enhanced Debugging
+
+Implements:
+1. Early stopping based on validation performance
+2. Portfolio weights logging with analysis
+3. Best model checkpointing
+4. Performance metric tracking
+5. Gradient and loss monitoring for debugging
+6. Action distribution analysis
+
+Created: 2025-01-09
+Refactored: 2025-01-11
+"""
+
+import numpy as np
+from typing import Optional, Dict, Any, List
+from pathlib import Path
+import json
+import torch
+from datetime import datetime
+
+from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
+from stable_baselines3.common.vec_env import VecEnv, DummyVecEnv
+
+
+class GradientMonitorCallback(BaseCallback):
+    """
+    Monitors gradient norms and detects gradient issues.
+    
+    Helps identify:
+    - Vanishing gradients
+    - Exploding gradients
+    - Dead neurons
+    """
+    
+    def __init__(
+        self,
+        log_freq: int = 100,
+        verbose: int = 0,
+        warn_threshold: float = 10.0,
+        check_dead_neurons: bool = True
+    ):
+        super().__init__(verbose)
+        self.log_freq = log_freq
+        self.warn_threshold = warn_threshold
+        self.check_dead_neurons = check_dead_neurons
+        self.gradient_history = []
+        
+    def _on_step(self) -> bool:
+        """Monitor gradients during training."""
+        if self.n_calls % self.log_freq == 0:
+            # Get policy network
+            policy = self.model.policy
+            
+            # Calculate gradient norms
+            grad_norms = {}
+            for name, param in policy.named_parameters():
+                if param.grad is not None:
+                    grad_norm = param.grad.data.norm(2).item()
+                    grad_norms[name] = grad_norm
+                    
+                    # Log to tensorboard
+                    self.logger.record(f'gradients/{name}_norm', grad_norm)
+                    
+                    # Check for issues
+                    if grad_norm > self.warn_threshold:
+                        if self.verbose > 0:
+                            print(f"⚠️ Large gradient in {name}: {grad_norm:.4f}")
+                    elif grad_norm < 1e-7:
+                        if self.verbose > 0:
+                            print(f"⚠️ Vanishing gradient in {name}: {grad_norm:.4e}")
+            
+            # Check for dead neurons (ReLU specific)
+            if self.check_dead_neurons and hasattr(policy, 'mlp_extractor'):
+                for idx, layer in enumerate(policy.mlp_extractor.policy_net):
+                    if isinstance(layer, torch.nn.Linear):
+                        # Check weight magnitudes
+                        weight_mean = layer.weight.data.abs().mean().item()
+                        dead_neurons = (layer.weight.data.abs().sum(dim=1) < 1e-6).sum().item()
+                        
+                        if dead_neurons > 0:
+                            total_neurons = layer.weight.shape[0]
+                            dead_pct = 100 * dead_neurons / total_neurons
+                            if self.verbose > 0:
+                                print(f"⚠️ Layer {idx}: {dead_neurons}/{total_neurons} "
+                                      f"dead neurons ({dead_pct:.1f}%)")
+                        
+                        self.logger.record(f'layer_health/layer_{idx}_dead_neurons', dead_neurons)
+                        self.logger.record(f'layer_health/layer_{idx}_weight_mean', weight_mean)
+            
+            # Store history
+            self.gradient_history.append({
+                'step': self.num_timesteps,
+                'grad_norms': grad_norms
+            })
+            
+        return True
+
+
+class ActionDistributionCallback(BaseCallback):
+    """
+    Analyzes action distributions to detect policy collapse.
+    
+    Monitors:
+    - Action entropy
+    - Portfolio weight distributions
+    - Concentration metrics (Herfindahl index)
+    """
+    
+    def __init__(
+        self,
+        log_freq: int = 100,
+        n_assets: int = 7,
+        verbose: int = 0,
+        warn_low_entropy: float = 0.1
+    ):
+        super().__init__(verbose)
+        self.log_freq = log_freq
+        self.n_assets = n_assets
+        self.warn_low_entropy = warn_low_entropy
+        self.action_history = []
+        
+    def _on_step(self) -> bool:
+        """Analyze action distributions."""
+        if self.n_calls % self.log_freq == 0:
+            # Get last actions
+            if 'actions' in self.locals:
+                actions = self.locals['actions']
+                
+                # For portfolio weights (assuming softmax/Dirichlet policy)
+                if len(actions.shape) > 1:
+                    weights = actions[0]  # Get first env's action
+                    
+                    # Calculate entropy
+                    weights_clipped = np.clip(weights, 1e-10, 1.0)
+                    entropy = -np.sum(weights_clipped * np.log(weights_clipped + 1e-10))
+                    max_entropy = np.log(self.n_assets)
+                    normalized_entropy = entropy / max_entropy
+                    
+                    # Calculate concentration (Herfindahl index)
+                    herfindahl = np.sum(weights ** 2)
+                    
+                    # Log metrics
+                    self.logger.record('action_dist/entropy', entropy)
+                    self.logger.record('action_dist/normalized_entropy', normalized_entropy)
+                    self.logger.record('action_dist/herfindahl', herfindahl)
+                    self.logger.record('action_dist/max_weight', np.max(weights))
+                    self.logger.record('action_dist/min_weight', np.min(weights))
+                    self.logger.record('action_dist/std_weight', np.std(weights))
+                    
+                    # Check for policy collapse
+                    if normalized_entropy < self.warn_low_entropy:
+                        if self.verbose > 0:
+                            print(f"⚠️ Low action entropy: {normalized_entropy:.3f} "
+                                  f"(weights: {weights})")
+                    
+                    # Store history
+                    self.action_history.append({
+                        'step': self.num_timesteps,
+                        'weights': weights.tolist(),
+                        'entropy': float(entropy),
+                        'herfindahl': float(herfindahl)
+                    })
+                    
+                    # Detect static allocations
+                    if len(self.action_history) > 10:
+                        recent_weights = [h['weights'] for h in self.action_history[-10:]]
+                        weight_std = np.std(recent_weights, axis=0).mean()
+                        
+                        if weight_std < 0.01:
+                            if self.verbose > 0:
+                                print(f"⚠️ Policy appears static! Weight std: {weight_std:.4f}")
+                            self.logger.record('action_dist/is_static', 1.0)
+                        else:
+                            self.logger.record('action_dist/is_static', 0.0)
+        
+        return True
+
+
+class ValidationPerformanceCallback(BaseCallback):
+    """
+    Comprehensive validation performance tracking.
+    
+    Evaluates model on validation set at regular intervals and
+    tracks multiple performance metrics.
+    """
+    
+    def __init__(
+        self,
+        eval_env,
+        eval_freq: int = 5000,
+        n_eval_episodes: int = 1,
+        deterministic: bool = True,
+        verbose: int = 1
+    ):
+        super().__init__(verbose)
+        self.eval_env = eval_env
+        self.eval_freq = eval_freq
+        self.n_eval_episodes = n_eval_episodes
+        self.deterministic = deterministic
+        self.evaluations_results = []
+        self.evaluations_timesteps = []
+        
+    def _on_step(self) -> bool:
+        """Evaluate on validation set."""
+        if self.n_calls % self.eval_freq == 0:
+            # Evaluate
+            val_metrics = self._evaluate()
+            
+            # Store results
+            self.evaluations_timesteps.append(self.num_timesteps)
+            self.evaluations_results.append(val_metrics)
+            
+            # Log to tensorboard
+            for key, value in val_metrics.items():
+                self.logger.record(f'eval/{key}', value)
+            
+            # Print summary
+            if self.verbose > 0:
+                print(f"\n📊 Validation @ step {self.num_timesteps}:")
+                print(f"   Sharpe: {val_metrics.get('sharpe_ratio', 0):.3f}")
+                print(f"   Return: {val_metrics.get('total_return', 0):.4f}")
+                print(f"   Drawdown: {val_metrics.get('max_drawdown', 0):.4f}")
+                print(f"   Win Rate: {val_metrics.get('win_rate', 0):.2%}")
+                
+            # Check for overfitting
+            if hasattr(self, 'train_metrics'):
+                train_sharpe = self.train_metrics.get('sharpe_ratio', 0)
+                val_sharpe = val_metrics.get('sharpe_ratio', 0)
+                
+                if train_sharpe - val_sharpe > 0.5:
+                    if self.verbose > 0:
+                        print(f"⚠️ Possible overfitting: Train Sharpe={train_sharpe:.3f}, "
+                              f"Val Sharpe={val_sharpe:.3f}")
+        
+        return True
+    
+    def _evaluate(self) -> Dict[str, float]:
+        """Run evaluation episodes."""
+        all_metrics = []
+        
+        for _ in range(self.n_eval_episodes):
+            obs, info = self.eval_env.reset()
+            done = False
+            truncated = False
+            
+            while not (done or truncated):
+                action, _ = self.model.predict(obs, deterministic=self.deterministic)
+                obs, reward, done, truncated, info = self.eval_env.step(action)
+            
+            # Get episode metrics
+            if hasattr(self.eval_env.unwrapped, 'get_episode_metrics'):
+                metrics = self.eval_env.unwrapped.get_episode_metrics()
+                all_metrics.append(metrics)
+        
+        # Average metrics
+        if all_metrics:
+            avg_metrics = {}
+            for key in all_metrics[0].keys():
+                values = [m[key] for m in all_metrics]
+                avg_metrics[key] = np.mean(values)
+            return avg_metrics
+        
+        return {'error': 'No metrics collected'}
+
+
+class PortfolioWeightsLogger(BaseCallback):
+    """
+    Enhanced portfolio weights logger with turnover analysis.
+    """
+    
+    def __init__(
+        self, 
+        log_freq: int = 1000,
+        track_turnover: bool = True,
+        verbose: int = 0
+    ):
+        super().__init__(verbose)
+        self.log_freq = log_freq
+        self.track_turnover = track_turnover
+        self.last_weights = None
+        self.turnover_history = []
+
+    def _on_step(self) -> bool:
+        """Log weights and calculate turnover."""
+        if self.locals.get('dones', [False])[0]:
+            if 'infos' in self.locals and len(self.locals['infos']) > 0:
+                info = self.locals['infos'][0]
+
+                if 'weights' in info:
+                    weights = info['weights']
+                    
+                    # Log individual weights
+                    from harlf.config.defaults import TICKERS
+                    for i, ticker in enumerate(TICKERS):
+                        self.logger.record(f'weights/{ticker}', weights[i])
+                    
+                    # Calculate and log concentration
+                    max_weight = np.max(weights)
+                    min_weight = np.min(weights)
+                    weight_std = np.std(weights)
+                    herfindahl = np.sum(weights ** 2)
+                    
+                    self.logger.record('weights/max', max_weight)
+                    self.logger.record('weights/min', min_weight) 
+                    self.logger.record('weights/std', weight_std)
+                    self.logger.record('weights/herfindahl', herfindahl)
+                    
+                    # Track turnover
+                    if self.track_turnover and self.last_weights is not None:
+                        turnover = np.sum(np.abs(weights - self.last_weights)) / 2
+                        self.turnover_history.append(turnover)
+                        self.logger.record('weights/turnover', turnover)
+                        
+                        # Warn if turnover is excessive
+                        if turnover > 0.5 and self.verbose > 0:
+                            print(f"⚠️ High turnover: {turnover:.3f}")
+                    
+                    self.last_weights = weights.copy()
+                
+                # Log other metrics
+                metrics_to_log = [
+                    'portfolio_value', 'portfolio_return', 'drawdown',
+                    'transaction_cost', 'sharpe_ratio'
+                ]
+                for metric in metrics_to_log:
+                    if metric in info:
+                        self.logger.record(f'episode/{metric}', info[metric])
+
+        return True
+
+
+class EarlyStoppingCallback(BaseCallback):
+    """
+    Monitors evaluation metrics from tensorboard logger and stops training when:
+    1. No improvement for 'patience' evaluations
+    2. Overfitting detected (train-val gap too large)
+    """
+
+    def __init__(
+        self,
+        eval_freq: int = 5000,
+        patience: int = 5,
+        min_delta: float = 0.01,
+        metric: str = 'eval/sharpe_ratio',
+        min_evaluations: int = 3,
+        check_overfitting: bool = True,
+        max_train_val_gap: float = 0.5,
+        verbose: int = 0
+    ):
+        super().__init__(verbose)
+        self.eval_freq = eval_freq
+        self.patience = patience
+        self.min_delta = min_delta
+        self.metric = metric
+        self.min_evaluations = min_evaluations
+        self.check_overfitting = check_overfitting
+        self.max_train_val_gap = max_train_val_gap
+        self.best_metric = -np.inf
+        self.wait = 0
+        self.evaluations_count = 0
+        self.last_eval_step = 0
+
+    def _on_step(self) -> bool:
+        """
+        ✅ FIXED: Proper SB3 callback implementation with robust metric lookup.
+        Checks if we should stop training based on evaluation metrics.
+        Returns False to stop training, True to continue.
+        """
+        # Check if it's time to evaluate (aligned with validation callback)
+        if self.n_calls % self.eval_freq != 0:
+            return True
+
+        # Skip if we haven't done enough evaluations
+        if self.evaluations_count < self.min_evaluations:
+            self.evaluations_count += 1
+            if self.verbose > 1:
+                print(f"   Early stopping: Evaluation {self.evaluations_count}/{self.min_evaluations} (waiting)")
+            return True
+
+        # Check if logger exists
+        if self.model.logger is None:
+            if self.verbose > 0:
+                print("⚠️  Early stopping: No logger available")
+            return True
+
+        # ✅ FIX 1: Try multiple metric name variations
+        metric_key = None
+        current_metric = None
+
+        # Extract base metric name (remove any existing prefix)
+        base_metric = self.metric.split('/')[-1]
+
+        # Try with different prefixes (most common to least)
+        for prefix in ['eval/', 'validation/', '']:
+            candidate_key = f"{prefix}{base_metric}" if prefix else base_metric
+
+            if candidate_key in self.model.logger.name_to_value:
+                metric_key = candidate_key
+                current_metric = self.model.logger.name_to_value[metric_key]
+                break
+
+        # Metric not found
+        if metric_key is None:
+            if self.verbose > 0 and self.evaluations_count == self.min_evaluations:
+                available_keys = list(self.model.logger.name_to_value.keys())
+                eval_keys = [k for k in available_keys if 'eval' in k or 'val' in k]
+                print(f"⚠️  Early stopping: Metric '{self.metric}' not found in logger")
+                print(f"   Available eval metrics: {eval_keys[:5]}")
+            self.evaluations_count += 1
+            return True
+
+        # ✅ FIX 2: Handle NaN/None values
+        if current_metric is None or (isinstance(current_metric, float) and np.isnan(current_metric)):
+            if self.verbose > 0:
+                print(f"⚠️  Early stopping: Invalid metric value: {current_metric}")
+            self.evaluations_count += 1
+            return True  # Don't count this as an evaluation
+
+        # ✅ FIX 3: Better logging
+        if self.verbose > 1:
+            print(f"\n   Early stopping check @ step {self.num_timesteps}:")
+            print(f"   Metric ({metric_key}): {current_metric:.4f}")
+            print(f"   Best: {self.best_metric:.4f}")
+
+        # Check for improvement
+        if current_metric > self.best_metric + self.min_delta:
+            self.best_metric = current_metric
+            self.wait = 0
+            if self.verbose > 0:
+                print(f"\n✅ Early stopping: Improved {metric_key}: {current_metric:.4f} (best: {self.best_metric:.4f})")
+        else:
+            self.wait += 1
+            if self.verbose > 0:
+                print(f"\n⏸️  Early stopping: No improvement ({self.wait}/{self.patience})")
+                print(f"   Current: {current_metric:.4f}, Best: {self.best_metric:.4f}, Delta: {current_metric - self.best_metric:.4f}")
+
+        # Check overfitting (if train metrics available)
+        if self.check_overfitting:
+            # Try to find corresponding train metric
+            train_metric_key = metric_key.replace('eval/', 'train/').replace('validation/', 'train/')
+
+            if train_metric_key in self.model.logger.name_to_value:
+                train_val = self.model.logger.name_to_value[train_metric_key]
+                val_val = current_metric
+
+                # Handle NaN in train metric
+                if train_val is not None and not (isinstance(train_val, float) and np.isnan(train_val)):
+                    gap = train_val - val_val
+
+                    if self.verbose > 1:
+                        print(f"   Overfitting check: Train={train_val:.3f}, Val={val_val:.3f}, Gap={gap:.3f}")
+
+                    if gap > self.max_train_val_gap:
+                        if self.verbose > 0:
+                            print(f"\n🛑 Early stopping: Overfitting detected!")
+                            print(f"   Train: {train_val:.3f}, Val: {val_val:.3f}, Gap: {gap:.3f} > {self.max_train_val_gap}")
+                        return False  # Stop due to overfitting
+
+        # Check patience
+        if self.wait >= self.patience:
+            if self.verbose > 0:
+                print(f"\n🛑 Early stopping triggered at step {self.num_timesteps}")
+                print(f"   Best {metric_key}: {self.best_metric:.4f}")
+                print(f"   No improvement for {self.patience} evaluations")
+            return False  # Stop training
+
+        self.evaluations_count += 1
+        return True  # Continue training
+
+
+class ComprehensiveLoggingCallback(BaseCallback):
+    """
+    Logs comprehensive metrics for debugging and analysis.
+    """
+    
+    def __init__(
+        self,
+        log_freq: int = 100,
+        save_path: Optional[Path] = None,
+        verbose: int = 0
+    ):
+        super().__init__(verbose)
+        self.log_freq = log_freq
+        self.save_path = Path(save_path) if save_path else None
+        self.metrics_history = []
+        
+    def _on_step(self) -> bool:
+        """Log comprehensive metrics."""
+        if self.n_calls % self.log_freq == 0:
+            metrics = {
+                'timestep': self.num_timesteps,
+                'n_calls': self.n_calls,
+                'time': datetime.now().isoformat(),
+            }
+            
+            # Get learning rate
+            if hasattr(self.model, 'learning_rate'):
+                if callable(self.model.learning_rate):
+                    lr = self.model.learning_rate(1.0)
+                else:
+                    lr = self.model.learning_rate
+                metrics['learning_rate'] = lr
+                self.logger.record('train/learning_rate', lr)
+            
+            # Get policy loss and value loss if available
+            if hasattr(self.model, 'logger') and self.model.logger:
+                if 'train/policy_gradient_loss' in self.model.logger.name_to_value:
+                    pg_loss = self.model.logger.name_to_value['train/policy_gradient_loss']
+                    metrics['policy_loss'] = pg_loss
+                    
+                if 'train/value_loss' in self.model.logger.name_to_value:
+                    v_loss = self.model.logger.name_to_value['train/value_loss']
+                    metrics['value_loss'] = v_loss
+                    
+                if 'train/entropy_loss' in self.model.logger.name_to_value:
+                    ent_loss = self.model.logger.name_to_value['train/entropy_loss']
+                    metrics['entropy_loss'] = ent_loss
+            
+            # Get environment info if available
+            if 'infos' in self.locals and self.locals['infos']:
+                info = self.locals['infos'][0]
+                for key in ['portfolio_value', 'sharpe_ratio', 'drawdown']:
+                    if key in info:
+                        metrics[f'env_{key}'] = info[key]
+            
+            self.metrics_history.append(metrics)
+            
+            # Save periodically
+            if self.save_path and len(self.metrics_history) % 10 == 0:
+                self._save_metrics()
+        
+        return True
+    
+    def _save_metrics(self):
+        """Save metrics history to file."""
+        if self.save_path:
+            self.save_path.mkdir(parents=True, exist_ok=True)
+            metrics_file = self.save_path / 'metrics_history.json'
+            
+            with open(metrics_file, 'w') as f:
+                json.dump(self.metrics_history, f, indent=2, default=str)
+            
+            if self.verbose > 0:
+                print(f"Saved metrics to {metrics_file}")
+
+
+# ============================================================================
+# TESTING
+# ============================================================================
+
+def test_callbacks():
+    """Test enhanced callbacks."""
+    print("="*80)
+    print("TESTING ENHANCED CALLBACKS")
+    print("="*80)
+
+    # Test 1: Gradient Monitor
+    print("\n1. Testing GradientMonitorCallback...")
+    grad_monitor = GradientMonitorCallback(log_freq=50, verbose=1)
+    print("   ✅ GradientMonitorCallback instantiated")
+
+    # Test 2: Action Distribution
+    print("\n2. Testing ActionDistributionCallback...")
+    action_dist = ActionDistributionCallback(n_assets=7, verbose=1)
+    print("   ✅ ActionDistributionCallback instantiated")
+
+    # Test 3: Enhanced Portfolio Logger
+    print("\n3. Testing Enhanced PortfolioWeightsLogger...")
+    weights_logger = PortfolioWeightsLogger(track_turnover=True, verbose=1)
+    print("   ✅ Enhanced PortfolioWeightsLogger instantiated")
+
+    # Test 4: Enhanced Early Stopping
+    print("\n4. Testing Enhanced EarlyStoppingCallback...")
+    early_stop = EarlyStoppingCallback(
+        patience=5,
+        check_overfitting=True,
+        verbose=1
+    )
+    print("   ✅ Enhanced EarlyStoppingCallback instantiated")
+
+    # Test 5: Comprehensive Logging
+    print("\n5. Testing ComprehensiveLoggingCallback...")
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmpdir:
+        comp_logger = ComprehensiveLoggingCallback(
+            save_path=Path(tmpdir),
+            verbose=1
+        )
+        print("   ✅ ComprehensiveLoggingCallback instantiated")
+
+    print("\n" + "="*80)
+    print("✅ ALL ENHANCED CALLBACK TESTS PASSED")
+    print("="*80)
+
+
+if __name__ == '__main__':
+    test_callbacks()

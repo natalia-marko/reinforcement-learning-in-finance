@@ -1,0 +1,415 @@
+weekly data - rebalancing monthly (ONCE IN 4 WEEKS), reinforcement learning portfolio system for 7 tech stocks (NVDA, MU, AAPL, AMD, ASML, MSFT, GOOG) using PPO (Proximal Policy Optimization). The system evolves sophisticated neural architectures with attention mechanisms.
+Core Purpose: Train an AI agent to dynamically allocate portfolio weights across tech stocks, optimizing for risk-adjusted returns (Sharpe ratio) while managing transaction costs.
+
+System architecture
+1.  Data Flow - The Foundation
+Raw Price Data (2015-2024) → Weekly Aggregation → 
+Train/Test Split (80/20) → Feature Engineering → Normalized Features → RL 
+train will be used for train and walk forward validation, test as out of sample data for final testing
+
+
+### Define Objectives and Constraints
+
+- MY TARGET is to build a reinforcement learning system on weekly data, for rebalansing every 4 weeks portfolio, maximizing sharpe ratio for my personal portfolio
+### create n_folds by splitting train data cronologically into train and validation and implement walking forward validation
+
+### Design Environment
+START WITH A SIMPLE NN MODEL as a baseline:
+
+class SimpleActor(nn.Module):
+    def __init__(self):
+        self.net = nn.Sequential(
+            nn.Linear(state_dim, 256),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, n_assets)
+        )
+    
+    def forward(self, x):
+        return F.softmax(self.net(x), dim=-1)
+    
+... improve reward signal:
+# Shorter lookback for denser signal
+reward_lookback = 4 
+# Or use immediate returns with risk penalty
+reward = weekly_return - lambda * portfolio_volatility
+
+add baseline strategy
+# Blend RL weights with equal-weight baseline
+final_weights = alpha * rl_weights + (1-alpha) * equal_weights
+alpha = min(0.7, training_progress)  # Start conservative
+
+
+AFTER implementing baseline, move to advanced one Complex architecture (Attention + LSTM)
+- Create a custom environment class (inheriting from `gym.Env`) with:
+  - **State:** Portfolio weights, price history, and financial indicators.
+  - **Actions:** Rebalancing allocation decisions (weight changes)[4].
+  - **Reward:** Combination of portfolio returns, risk penalties, transaction costs, and turnover[1][3].
+- Validate with Toy/Benchmark portfolios before scaling up.
+
+### 4. Specify Weekly Rebalancing Logic
+
+- Implement environment to allow actions only once per week:
+  ```python
+  if current_week % 4 == 0: # assuming weekly data, rebalance every 4 weeks
+      # Allow agent to act (rebalance)
+  ```
+- Log portfolio adjustment dates and new weights to trace agent's decisions[2].
+
+### 5. Select and Configure RL Model
+
+- Use agent architectures like DQN, PPO, or A2C (from stable-baselines3 or custom):
+  - Tune hyperparameters (learning rate, batch size, gamma, etc.).
+  - Set up training episodes simulating multiple weeks, running thousands of episodes for policy refinement[1][3][4].
+
+### 6. Train Agent
+
+- Log rewards, actions, and episode summaries for review.
+- Save model checkpoints so progress and reproduction are possible.
+
+### 7. Validate & Backtest
+
+- Use out-of-sample (unseen) data to validate agent behavior.
+- Compare against benchmarks (equal-weight, buy-and-hold) for Sharpe ratio, drawdown, turnover, etc.[2].
+- Document failures/tradeoffs for iterative model improvements.
+
+### 8. Performance Analysis & Visualization
+
+- Visualize portfolio value, asset weights, and signal metrics using matplotlib or Plotly[2].
+- Calculate portfolio returns, individual asset returns, allocation weights, and risk metrics within analysis scripts.
+- Optionally use libraries like PyFolio for in-depth performance evaluation.
+
+### 9. Documentation & Maintenance
+
+- Store all environment, model, data, and result files in a well-organized project folder.
+- Maintain a changelog and markdown documentation (README or mf document).
+- Summarize findings, model limitations, and next steps for easy collaboration and review[1].
+
+
+## RL Environment Design
+
+Document environment specification for repeatable training.
+
+- Implement or customize OpenAI Gym-like interface:
+  - `reset()`, `step(action)`, `get_observation()`, etc.
+  - Support for multi-asset, action masking, reward normalization.
+- Sample structure:
+  ```python
+  class PortfolioEnv(gym.Env):
+      def __init__(self, data, ...):
+          # code setup
+      def reset(self):
+          # reset logic
+      def step(self, action):
+          # environment update
+  ```
+- Save environment configs and sample episodes.
+
+## Model Training Guidelines
+
+Outline training, experimentation, and evaluation procedures.
+
+- Baseline: Use DQN or PPO from stable-baselines3.
+- Hyperparameter tuning: Learning rate, batch size, reward scaling, episode length.
+- Model checkpointing: Save models regularly.
+- Experiment logs: Save all metrics, validation scores, and visualizations.
+
+## Evaluation & Backtesting
+
+Steps for model validation and performance review.
+
+- Use out-of-sample backtesting with unseen market periods.
+- Metrics: Sharpe ratio, max drawdown, volatility, portfolio turnover.
+- Visualize portfolio trajectories:
+  ```python
+  import matplotlib.pyplot as plt
+  plt.plot(portfolio_returns)
+  plt.show()
+  ```
+
+Critical Design Choice: Monthly rebalancing on weekly data:
+    - Transaction costs (2.5 bps per trade)
+    - Portfolio Environment (Gymnasium-based):
+        - State Space: Asset features + current weights + portfolio stats + time embeddings
+        - Action Space: Weight allocation [0,1] for each asset (softmax normalized to sum=1)
+        - Reward: Sharpe ratio calculated over 4-week rolling window
+        - Constraints: Max 40% per asset, transaction costs, slippage modeling
+
+Neural Architecture (Actor-Critic)
+Actor Network (Makes Allocation Decisions):
+├── Feature Extraction: 512 → 256 neurons
+├── Multi-Head Attention: 8 heads (captures asset correlations)
+├── LSTM: 2 layers, 128 hidden (temporal patterns)
+└── Softmax Output: Valid portfolio weights
+
+Critic Network (Evaluates State Value):
+└── Deep MLP: State → 512 → 256 → 128 → 1 (value)
+
+PPO Training Algorithm
+
+Exploration: Starts at 40%, decays to 5% minimum
+Clipped objective: Prevents catastrophic policy updates
+Entropy bonus: 0.05 coefficient encourages diversity
+Early stopping: Patience=50 episodes on validation Sharpe
+
+⏺ PPO Model Architecture Explained
+
+  What We're Using
+
+  model = PPO(
+      "MlpPolicy",           # Actor-Critic MLP
+      train_env,
+      policy_kwargs={
+          'net_arch': [256, 256],  # Shared layers
+          'activation_fn': nn.Tanh
+      },
+      ...
+  )
+
+  Actor-Critic Architecture
+
+  PPO uses two networks (but we share layers):
+
+                      Input: State (338 dims)
+                             ↓
+                      ┌─────────────┐
+                      │ Shared MLP  │
+                      │  256 → 256  │
+                      └─────────────┘
+                             ↓
+                ┌────────────┴────────────┐
+                ↓                         ↓
+         ┌─────────────┐          ┌─────────────┐
+         │   ACTOR     │          │   CRITIC    │
+         │  (Policy)   │          │   (Value)   │
+         └─────────────┘          └─────────────┘
+                ↓                         ↓
+        Action: 7 weights          Value: scalar
+        (portfolio allocation)     (expected return)
+
+  Actor (Policy Network)
+
+  Output: Continuous action distribution for 7 asset weights
+
+  # For each asset, outputs:
+  # - Mean (μ) of Gaussian distribution
+  # - Log std (σ) of Gaussian distribution
+
+  # Action sampling:
+  action = μ + σ * noise  # Then softmax to get weights that sum to 1
+
+  The policy learns: "Given this market state, what portfolio weights maximize future rewards?"
+
+  Critic (Value Network)
+
+  Output: Single scalar V(s) = expected cumulative reward from state s
+
+  Used for:
+  - Computing advantage estimates (GAE)
+  - Reducing variance in policy gradient
+
+  The critic learns: "How good is this market state for making money?"
+
+  How PPO Training Works
+
+  1. Collect rollouts: Run policy, collect (state, action, reward) tuples
+  2. Compute advantages: A(s,a) = Q(s,a) - V(s)
+  3. Update policy: Maximize reward while staying close to old policy (clipping)
+  4. Update value function: Minimize MSE between V(s) and actual returns
+
+  Action Space for Portfolio
+
+  # Action space: Box(low=-1, high=1, shape=(7,))
+  # Raw output from network: [-0.3, 0.8, 0.1, -0.5, 0.2, 0.4, 0.6]
+
+  # Converted to weights via softmax:
+  # weights = softmax(raw_action) = [0.09, 0.27, 0.13, 0.07, 0.15, 0.18, 0.11]
+  # Sum = 1.0 ✓
+
+  Key PPO Hyperparameters
+
+  | Parameter  | Value | Purpose                         |
+  |------------|-------|---------------------------------|
+  | clip_range | 0.2   | Limits policy change per update |
+  | ent_coef   | 0.01  | Encourages exploration          |
+  | vf_coef    | 0.5   | Value loss weight               |
+  | n_epochs   | 10    | Updates per batch               |
+  | gae_lambda | 0.95  | Advantage estimation smoothing  |
+
+  Why PPO for Portfolio?
+
+  Pros:
+  - Stable training (clipping prevents catastrophic updates)
+  - Works with continuous actions (portfolio weights)
+  - Sample efficient for on-policy methods
+
+  Cons:
+  - On-policy = can't reuse old data
+  - Needs many environment interactions
+  - Can still overfit with small datasets (our problem)
+
+  ---
+  Alternative approaches used in industry:
+  - SAC (Soft Actor-Critic): Off-policy, better sample efficiency
+  - TD3: Off-policy, handles continuous actions well
+  - Model-based RL: Learn market dynamics, plan ahead
+
+  2. LSTM + PPO (Excellent Idea!)
+
+  Current MLP is memoryless - it sees each state independently. But markets have:
+  - Regime persistence (bull/bear markets last months)
+  - Momentum/mean-reversion patterns
+  - Autocorrelation in volatility
+
+  LSTM-PPO Architecture
+
+                  Time Series Input
+                        ↓
+      ┌─────────────────────────────────┐
+      │   State t-3  →  LSTM (128)      │
+      │   State t-2  →  LSTM (128)      │
+      │   State t-1  →  LSTM (128)      │
+      │   State t    →  LSTM (128)  ────┼──→ Hidden State
+      └─────────────────────────────────┘
+                        ↓
+                ┌─────────────┐
+                │  MLP 256    │
+                └─────────────┘
+                        ↓
+                Actor / Critic
+
+  Implementation with sb3-contrib
+
+  from sb3_contrib import RecurrentPPO
+
+  model = RecurrentPPO(
+      "MlpLstmPolicy",
+      train_env,
+      policy_kwargs={
+          'lstm_hidden_size': 128,
+          'n_lstm_layers': 1,
+          'shared_lstm': True,
+          'net_arch': [256],  # After LSTM
+          'activation_fn': nn.Tanh
+      },
+      learning_rate=3e-4,
+      n_steps=2048,
+      batch_size=64,
+      n_epochs=10,
+      gamma=0.99,
+      ent_coef=0.01,
+      verbose=1
+  )
+
+  Why LSTM-PPO Could Work Better
+
+  | Aspect           | MLP                 | LSTM                    |
+  |------------------|---------------------|-------------------------|
+  | Memory           | None                | Sequences of states     |
+  | Regime detection | Must be in features | Can learn from patterns |
+  | Momentum         | Explicit features   | Implicit + explicit     |
+  | State size       | 338                 | 338 per step × sequence |
+
+  ---
+  My Recommendation
+
+  Phase 1 (Now):
+  - Wait for current training to finish
+  - See if curated features help
+
+  Phase 2 (Next):
+  1. Implement unified reward (simplify)
+  2. Add LSTM-PPO using sb3-contrib
+  3. Compare: MLP vs LSTM-PPO
+
+  Installation needed:
+  pip install sb3-contrib
+
+  Summary of Changes
+
+  1. Unified Reward Function
+
+  reward = sharpe - drawdown_penalty - turnover_penalty
+  - Simple: 3 components (vs 5-6 before)
+  - Interpretable: Sharpe is the target, penalties for risk & cost
+  - Well-scaled: All components in similar range, clipped to [-2, 2]
+
+  2. LSTM-PPO Support
+
+  - Installed sb3-contrib
+  - Notebook supports both MLP-PPO and LSTM-PPO
+  - Set USE_LSTM = True in notebook to enable
+
+  3. Curated Features (46 vs 151)
+
+  - State dimension: 338 (vs 1073)
+  - All features are interpretable and based on factor literature
+
+  Files Modified/Created
+
+  | File                                  | Changes                                            |
+  |---------------------------------------|----------------------------------------------------|
+  | config.py                             | Added unified reward weights, CURATED_FEATURE_COLS |
+  | rl_system.py                          | Added unified reward calculation                   |
+  | notebooks/05_retrain_best_model.ipynb | LSTM-PPO support, unified reward                   |
+  | test_unified_lstm.py                  | New test script (all tests pass)                   |
+
+  How to Train
+
+  Option 1: LSTM-PPO (recommended)
+  USE_LSTM = True  # In cell-4 of notebook
+
+  Option 2: Standard MLP-PPO
+  USE_LSTM = False
+
+  LSTM-PPO Architecture
+
+  State (338 dims) → LSTM (128) → MLP (256) → Actor/Critic
+
+  The LSTM can learn:
+  - Market regime persistence
+  - Momentum patterns over time
+  - Volatility clustering
+  ⏺ Excellent! Now the splits are correct
+
+  | Fold | Train                   | Embargo  | Val         | Train/Val Ratio |
+  |------|-------------------------|----------|-------------|-----------------|
+  | 0    | 218 periods (4.2 years) | 26 weeks | 52 (1 year) | 4.2x            |
+  | 1    | 296 periods (5.7 years) | 26 weeks | 52 (1 year) | 5.7x            |
+  | 2    | 374 periods (7.2 years) | 26 weeks | 52 (1 year) | 7.2x            |
+
+  What the embargo prevents:
+
+  1. Reward leakage: Reward lookback is 12 weeks, embargo is 26 weeks → no overlap
+  2. Feature leakage: 26-week features (sharpe_26w, momentum_26w) → no overlap
+
+  Visual timeline:
+
+  Fold 0: |----TRAIN----|..GAP..|--VAL--|
+          2015       2019-02    2019-09  2020-08
+
+  Fold 1: |--------TRAIN--------|..GAP..|--VAL--|
+          2015                2020-08    2021-03  2022-02
+
+  Fold 2: |------------TRAIN------------|..GAP..|--VAL--|
+          2015                        2022-02    2022-09  2023-08
+
+  Comparison with before:
+
+  | Metric          | Before (broken) | After (fixed) |
+  |-----------------|-----------------|---------------|
+  | Fold 0 train    | 90 periods      | 218 periods   |
+  | Embargo gap     | 0 weeks         | 26 weeks      |
+  | Train/Val ratio | 0.75x           | 4.2x          |
+  | All data used   | No              | Yes           |
+
+  ---
+  Summary - All Issues Fixed
+
+  1. ✅ Unified reward - Simple 3-component function
+  2. ✅ LSTM-PPO - Installed and ready
+  3. ✅ Curated features - 46 interpretable features
+  4. ✅ Fixed fold splits - Train >> Val, expanding windows
+  5. ✅ Embargo gap - 26 weeks to prevent leakage

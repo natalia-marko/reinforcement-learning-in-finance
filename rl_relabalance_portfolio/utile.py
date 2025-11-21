@@ -13,7 +13,6 @@ import pickle
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestRegressor
 from ta.momentum import RSIIndicator, ROCIndicator, StochasticOscillator
 from ta.trend import MACD

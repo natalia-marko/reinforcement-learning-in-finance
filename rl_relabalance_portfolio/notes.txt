@@ -1,0 +1,43 @@
+# Load evaluation results from each fold
+print("=" * 80)
+print("TRIAL 5 EVALUATION RESULTS")
+print("="  * 80)
+
+for result in results:
+    if result['status'] == 'success':
+        fold_idx = result['fold']
+        fold_dir = result['fold_dir']
+        
+        # Load evaluations.npz
+        eval_file = fold_dir / 'evaluations.npz'
+        if eval_file.exists():
+            with np.load(eval_file) as data:
+                timesteps = data['timesteps']
+                results_array = data['results']
+                ep_lengths = data['ep_lengths']
+                
+                # Calculate mean reward per evaluation
+                mean_rewards = results_array.mean(axis=1)
+                best_reward = mean_rewards.max()
+                best_step = timesteps[mean_rewards.argmax()]
+                final_reward = mean_rewards[-1]
+                
+                print(f"\nFold {fold_idx}:")
+                print(f"  Best val reward: {best_reward:.4f} (at step {best_step:,})")
+                print(f"  Final val reward: {final_reward:.4f}")
+                print(f"  Evaluations: {len(timesteps)}")
+                
+                # Check for overfitting (significant drop from best to final)
+                drop = (best_reward - final_reward) / abs(best_reward) * 100
+                if drop > 40:
+                    print(f"  ❌ Performance dropped {drop:.1f}% from peak (severe overfitting)")
+                elif drop > 10:
+                    print(f"  ⚠️ Performance dropped {drop:.1f}% from peak (moderate overfitting)")
+                else:
+                    print(f"  ✓ Stable performance (drop: {drop:.1f}%)")
+        else:
+            print(f"\nFold {fold_idx}: No evaluation file found")
+
+print("\n" + "="*80)
+print("Compare to Trial 2: Avg Sharpe 1.097, Val drops 20-66%")
+print("="*80)

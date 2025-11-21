@@ -1,0 +1,1280 @@
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+Users of this version of Gym should be able to simply replace 'import gym' with 'import gymnasium as gym' in the vast majority of cases.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+================================================================================
+ENHANCED PPO TRAINING - FOLD 0
+================================================================================
+
+Configuration:
+  reward_type: simple
+  learning_rate: 3e-05
+  n_steps: 2048
+  batch_size: 64
+  n_epochs: 10
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  clip_range_vf: None
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  net_arch: [256, 256]
+  activation_fn: tanh
+  ortho_init: True
+  use_layer_norm: False
+  use_sde: False
+  normalize_obs: False
+  normalize_reward: False
+  ema_window: 21
+================================================================================
+
+Creating environments...
+
+📊 Data Validation - Forward Returns (0, train):
+   Mean: 0.004207 (0.4216% simple)
+   Std:  0.027696
+   Range: [-0.0974, 0.1527]
+   Max |return|: 0.1527 (16.5% simple)
+   ✅ Data looks reasonable
+
+
+📊 Data Validation - Forward Returns (0, val):
+   Mean: 0.000557 (0.0558% simple)
+   Std:  0.026444
+   Range: [-0.0768, 0.0652]
+   Max |return|: 0.0768 (8.0% simple)
+   ✅ Data looks reasonable
+
+Train environment: (119,)
+Action space: (7,)
+
+Creating model...
+Using cpu device
+
+🚀 Starting training...
+Logging to ./tensorboard_logs/PPO_fold_0_simple_1
+--------------------------------------
+| episode/            |              |
+|    drawdown         | 0.07832776   |
+|    portfolio_return | -0.01982106  |
+|    portfolio_value  | 145497.3     |
+|    transaction_cost | 0.0014997906 |
+| rollout/            |              |
+|    ep_len_mean      | 108          |
+|    ep_rew_mean      | 0.355        |
+| time/               |              |
+|    fps              | 1659         |
+|    iterations       | 1            |
+|    time_elapsed     | 1            |
+|    total_timesteps  | 2048         |
+| weights/            |              |
+|    AAPL             | 0.13543235   |
+|    AMD              | 0.09999022   |
+|    ASML             | 0.1473166    |
+|    GOOG             | 0.33591452   |
+|    MSFT             | 0.052107796  |
+|    MU               | 0.003203576  |
+|    NVDA             | 0.22603494   |
+|    herfindahl       | 0.21669799   |
+|    max              | 0.33591452   |
+|    min              | 0.003203576  |
+|    std              | 0.102706835  |
+|    turnover         | 0.4843889    |
+--------------------------------------
+------------------------------------------
+| episode/                |              |
+|    drawdown             | 0.091905646  |
+|    portfolio_return     | -0.016607955 |
+|    portfolio_value      | 138676.89    |
+|    transaction_cost     | 0.0014143564 |
+| rollout/                |              |
+|    ep_len_mean          | 108          |
+|    ep_rew_mean          | 0.346        |
+| time/                   |              |
+|    fps                  | 1406         |
+|    iterations           | 2            |
+|    time_elapsed         | 2            |
+|    total_timesteps      | 4096         |
+| train/                  |              |
+|    approx_kl            | 0.0130355125 |
+|    clip_fraction        | 0.151        |
+|    clip_range           | 0.2          |
+|    entropy_loss         | 7.07         |
+|    explained_variance   | -9.42        |
+|    learning_rate        | 3e-05        |
+|    loss                 | 0.0576       |
+|    n_updates            | 10           |
+|    policy_gradient_loss | -0.0246      |
+|    std                  | 0.135        |
+|    value_loss           | 0.0206       |
+| weights/                |              |
+|    AAPL                 | 0.014111987  |
+|    AMD                  | 0.3598797    |
+|    ASML                 | 0.21402186   |
+|    GOOG                 | 0.0058904323 |
+|    MSFT                 | 0.13287899   |
+|    MU                   | 0.14740701   |
+|    NVDA                 | 0.12580992   |
+|    herfindahl           | 0.23076639   |
+|    max                  | 0.3598797    |
+|    min                  | 0.0058904323 |
+|    std                  | 0.11206457   |
+|    turnover             | 0.17915234   |
+------------------------------------------
+
+📊 Validation @ step 5000:
+   Sharpe: 0.200
+   Return: 0.0048
+   Drawdown: 0.0513
+   Win Rate: 0.00%
+-------------------------------------------
+| episode/                |               |
+|    drawdown             | 0.07001608    |
+|    portfolio_return     | -0.017126529  |
+|    portfolio_value      | 151027.3      |
+|    transaction_cost     | 0.001199983   |
+| eval/                   |               |
+|    episode_length       | 18            |
+|    final_value          | 100482.42     |
+|    max_drawdown         | 0.05132311    |
+|    mean_daily_return    | 0.00026737392 |
+|    mean_turnover        | 0.097800426   |
+|    sharpe_ratio         | 0.2           |
+|    sortino_ratio        | nan           |
+|    total_return         | 0.0048242807  |
+|    volatility           | 0.337         |
+| rollout/                |               |
+|    ep_len_mean          | 108           |
+|    ep_rew_mean          | 0.349         |
+| time/                   |               |
+|    fps                  | 1339          |
+|    iterations           | 3             |
+|    time_elapsed         | 4             |
+|    total_timesteps      | 6144          |
+| train/                  |               |
+|    approx_kl            | 0.009369757   |
+|    clip_fraction        | 0.0942        |
+|    clip_range           | 0.2           |
+|    entropy_loss         | 7.07          |
+|    explained_variance   | -0.435        |
+|    learning_rate        | 3e-05         |
+|    loss                 | 0.0261        |
+|    n_updates            | 20            |
+|    policy_gradient_loss | -0.0186       |
+|    std                  | 0.135         |
+|    value_loss           | 0.00266       |
+| weights/                |               |
+|    AAPL                 | 0.028664397   |
+|    AMD                  | 0.2958104     |
+|    ASML                 | 0.0068267225  |
+|    GOOG                 | 0.2135558     |
+|    MSFT                 | 0.30566463    |
+|    MU                   | 0.074202456   |
+|    NVDA                 | 0.07527561    |
+|    herfindahl           | 0.2385814     |
+|    max                  | 0.30566463    |
+|    min                  | 0.0068267225  |
+|    std                  | 0.1169397     |
+|    turnover             | 0.5202513     |
+-------------------------------------------
+-------------------------------------------
+| episode/                |               |
+|    drawdown             | 0.071944624   |
+|    portfolio_return     | -0.006760747  |
+|    portfolio_value      | 138617.47     |
+|    transaction_cost     | 0.00090992276 |
+| rollout/                |               |
+|    ep_len_mean          | 108           |
+|    ep_rew_mean          | 0.352         |
+| time/                   |               |
+|    fps                  | 1323          |
+|    iterations           | 4             |
+|    time_elapsed         | 6             |
+|    total_timesteps      | 8192          |
+| train/                  |               |
+|    approx_kl            | 0.011789249   |
+|    clip_fraction        | 0.122         |
+|    clip_range           | 0.2           |
+|    entropy_loss         | 7.09          |
+|    explained_variance   | 0.808         |
+|    learning_rate        | 3e-05         |
+|    loss                 | 0.0538        |
+|    n_updates            | 30            |
+|    policy_gradient_loss | -0.0197       |
+|    std                  | 0.135         |
+|    value_loss           | 0.00103       |
+| weights/                |               |
+|    AAPL                 | 0.02162442    |
+|    AMD                  | 0.04845542    |
+|    ASML                 | 0.35003614    |
+|    GOOG                 | 0.004731642   |
+|    MSFT                 | 0.38247794    |
+|    MU                   | 0.019991847   |
+|    NVDA                 | 0.1726826     |
+|    herfindahl           | 0.30187157    |
+|    max                  | 0.38247794    |
+|    min                  | 0.004731642   |
+|    std                  | 0.15071942    |
+|    turnover             | 0.2932366     |
+-------------------------------------------
+
+📊 Validation @ step 10000:
+   Sharpe: 0.176
+   Return: 0.0043
+   Drawdown: 0.0516
+   Win Rate: 0.00%
+-------------------------------------------
+| episode/                |               |
+|    drawdown             | 0.08108592    |
+|    portfolio_return     | -0.015872974  |
+|    portfolio_value      | 143367.45     |
+|    transaction_cost     | 0.00078021624 |
+| eval/                   |               |
+|    episode_length       | 18            |
+|    final_value          | 100428.03     |
+|    max_drawdown         | 0.05156177    |
+|    mean_daily_return    | 0.0002372983  |
+|    mean_turnover        | 0.101675965   |
+|    sharpe_ratio         | 0.176         |
+|    sortino_ratio        | nan           |
+|    total_return         | 0.004280448   |
+|    volatility           | 0.339         |
+| rollout/                |               |
+|    ep_len_mean          | 108           |
+|    ep_rew_mean          | 0.355         |
+| time/                   |               |
+|    fps                  | 1249          |
+|    iterations           | 5             |
+|    time_elapsed         | 8             |
+|    total_timesteps      | 10240         |
+| train/                  |               |
+|    approx_kl            | 0.011232559   |
+|    clip_fraction        | 0.12          |
+|    clip_range           | 0.2           |
+|    entropy_loss         | 7.09          |
+|    explained_variance   | 0.945         |
+|    learning_rate        | 3e-05         |
+|    loss                 | 0.0551        |
+|    n_updates            | 40            |
+|    policy_gradient_loss | -0.0201       |
+|    std                  | 0.135         |
+|    value_loss           | 0.000449      |
+| weights/                |               |
+|    AAPL                 | 0.091794096   |
+|    AMD                  | 0.17848031    |
+|    ASML                 | 0.3391041     |
+|    GOOG                 | 0.07903575    |
+|    MSFT                 | 0.085847266   |
+|    MU                   | 0.08545432    |
+|    NVDA                 | 0.14028418    |
+|    herfindahl           | 0.19587147    |
+|    max                  | 0.3391041     |
+|    min                  | 0.07903575    |
+|    std                  | 0.0870257     |
+|    turnover             | 0.25221157    |
+-------------------------------------------
+------------------------------------------
+| episode/                |              |
+|    drawdown             | 0.08409704   |
+|    portfolio_return     | -0.009850549 |
+|    portfolio_value      | 167326.98    |
+|    transaction_cost     | 0.000885046  |
+| rollout/                |              |
+|    ep_len_mean          | 108          |
+|    ep_rew_mean          | 0.369        |
+| time/                   |              |
+|    fps                  | 1226         |
+|    iterations           | 6            |
+|    time_elapsed         | 10           |
+|    total_timesteps      | 12288        |
+| train/                  |              |
+|    approx_kl            | 0.0108508635 |
+|    clip_fraction        | 0.118        |
+|    clip_range           | 0.2          |
+|    entropy_loss         | 7.09         |
+|    explained_variance   | 0.963        |
+|    learning_rate        | 3e-05        |
+|    loss                 | 0.0449       |
+|    n_updates            | 50           |
+|    policy_gradient_loss | -0.0212      |
+|    std                  | 0.135        |
+|    value_loss           | 0.000354     |
+| weights/                |              |
+|    AAPL                 | 0.057426743  |
+|    AMD                  | 0.115653336  |
+|    ASML                 | 0.06737662   |
+|    GOOG                 | 0.112778515  |
+|    MSFT                 | 0.2563026    |
+|    MU                   | 0.105815746  |
+|    NVDA                 | 0.28464654   |
+|    herfindahl           | 0.19184376   |
+|    max                  | 0.28464654   |
+|    min                  | 0.057426743  |
+|    std                  | 0.08365456   |
+|    turnover             | 0.28966522   |
+------------------------------------------
+------------------------------------------
+| episode/                |              |
+|    drawdown             | 0.08736602   |
+|    portfolio_return     | -0.01700104  |
+|    portfolio_value      | 149976.9     |
+|    transaction_cost     | 0.0010663725 |
+| rollout/                |              |
+|    ep_len_mean          | 108          |
+|    ep_rew_mean          | 0.38         |
+| time/                   |              |
+|    fps                  | 1225         |
+|    iterations           | 7            |
+|    time_elapsed         | 11           |
+|    total_timesteps      | 14336        |
+| train/                  |              |
+|    approx_kl            | 0.01251887   |
+|    clip_fraction        | 0.126        |
+|    clip_range           | 0.2          |
+|    entropy_loss         | 7.1          |
+|    explained_variance   | 0.97         |
+|    learning_rate        | 3e-05        |
+|    loss                 | 0.0451       |
+|    n_updates            | 60           |
+|    policy_gradient_loss | -0.0264      |
+|    std                  | 0.135        |
+|    value_loss           | 0.000358     |
+| weights/                |              |
+|    AAPL                 | 0.014287961  |
+|    AMD                  | 0.37762204   |
+|    ASML                 | 0.112867795  |
+|    GOOG                 | 0.06465886   |
+|    MSFT                 | 0.094685934  |
+|    MU                   | 0.11071135   |
+|    NVDA                 | 0.22516619   |
+|    herfindahl           | 0.23164472   |
+|    max                  | 0.37762204   |
+|    min                  | 0.014287961  |
+|    std                  | 0.11262296   |
+|    turnover             | 0.3611485    |
+------------------------------------------
+
+📊 Validation @ step 15000:
+   Sharpe: 0.217
+   Return: 0.0053
+   Drawdown: 0.0516
+   Win Rate: 0.00%
+-------------------------------------------
+| episode/                |               |
+|    drawdown             | 0.08823886    |
+|    portfolio_return     | -0.018701687  |
+|    portfolio_value      | 150821.88     |
+|    transaction_cost     | 0.0013986407  |
+| eval/                   |               |
+|    episode_length       | 18            |
+|    final_value          | 100531.586    |
+|    max_drawdown         | 0.051628508   |
+|    mean_daily_return    | 0.00029454552 |
+|    mean_turnover        | 0.103909425   |
+|    sharpe_ratio         | 0.217         |
+|    sortino_ratio        | nan           |
+|    total_return         | 0.0053159     |
+|    volatility           | 0.341         |
+| rollout/                |               |
+|    ep_len_mean          | 108           |
+|    ep_rew_mean          | 0.395         |
+| time/                   |               |
+|    fps                  | 1222          |
+|    iterations           | 8             |
+|    time_elapsed         | 13            |
+|    total_timesteps      | 16384         |
+| train/                  |               |
+|    approx_kl            | 0.012671266   |
+|    clip_fraction        | 0.124         |
+|    clip_range           | 0.2           |
+|    entropy_loss         | 7.12          |
+|    explained_variance   | 0.97          |
+|    learning_rate        | 3e-05         |
+|    loss                 | 0.0501        |
+|    n_updates            | 70            |
+|    policy_gradient_loss | -0.0251       |
+|    std                  | 0.135         |
+|    value_loss           | 0.000323      |
+| weights/                |               |
+|    AAPL                 | 0.09633971    |
+|    AMD                  | 0.2509792     |
+|    ASML                 | 0.21801394    |
+|    GOOG                 | 0.116587594   |
+|    MSFT                 | 0.10976113    |
+|    MU                   | 0.14997081    |
+|    NVDA                 | 0.058347646   |
+|    herfindahl           | 0.17133781    |
+|    max                  | 0.2509792     |
+|    min                  | 0.058347646   |
+|    std                  | 0.06378613    |
+|    turnover             | 0.39500496    |
+-------------------------------------------
+------------------------------------------
+| episode/                |              |
+|    drawdown             | 0.058206376  |
+|    portfolio_return     | -0.011410708 |
+|    portfolio_value      | 178902.48    |
+|    transaction_cost     | 0.0006705923 |
+| rollout/                |              |
+|    ep_len_mean          | 108          |
+|    ep_rew_mean          | 0.414        |
+| time/                   |              |
+|    fps                  | 1227         |
+|    iterations           | 9            |
+|    time_elapsed         | 15           |
+|    total_timesteps      | 18432        |
+| train/                  |              |
+|    approx_kl            | 0.01525111   |
+|    clip_fraction        | 0.158        |
+|    clip_range           | 0.2          |
+|    entropy_loss         | 7.14         |
+|    explained_variance   | 0.977        |
+|    learning_rate        | 3e-05        |
+|    loss                 | 0.0395       |
+|    n_updates            | 80           |
+|    policy_gradient_loss | -0.03        |
+|    std                  | 0.135        |
+|    value_loss           | 0.000259     |
+| weights/                |              |
+|    AAPL                 | 0.0029256048 |
+|    AMD                  | 0.3114269    |
+|    ASML                 | 0.087099865  |
+|    GOOG                 | 0.030400163  |
+|    MSFT                 | 0.38656887   |
+|    MU                   | 0.029634811  |
+|    NVDA                 | 0.15194383   |
+|    herfindahl           | 0.27890646   |
+|    max                  | 0.38656887   |
+|    min                  | 0.0029256048 |
+|    std                  | 0.13941167   |
+|    turnover             | 0.5972571    |
+------------------------------------------
+
+📊 Validation @ step 20000:
+   Sharpe: 0.293
+   Return: 0.0072
+   Drawdown: 0.0513
+   Win Rate: 0.00%
+⚠️  Metric 'sharpe_ratio' not found in logger
+-------------------------------------------
+| episode/                |               |
+|    drawdown             | 0.06766267    |
+|    portfolio_return     | -0.012999457  |
+|    portfolio_value      | 159542.02     |
+|    transaction_cost     | 0.0008156913  |
+| eval/                   |               |
+|    episode_length       | 18            |
+|    final_value          | 100720.59     |
+|    max_drawdown         | 0.051288035   |
+|    mean_daily_return    | 0.00039889995 |
+|    mean_turnover        | 0.10438578    |
+|    sharpe_ratio         | 0.293         |
+|    sortino_ratio        | nan           |
+|    total_return         | 0.0072060823  |
+|    volatility           | 0.343         |
+| rollout/                |               |
+|    ep_len_mean          | 108           |
+|    ep_rew_mean          | 0.44          |
+| time/                   |               |
+|    fps                  | 1228          |
+|    iterations           | 10            |
+|    time_elapsed         | 16            |
+|    total_timesteps      | 20480         |
+| train/                  |               |
+|    approx_kl            | 0.01150499    |
+|    clip_fraction        | 0.121         |
+|    clip_range           | 0.2           |
+|    entropy_loss         | 7.15          |
+|    explained_variance   | 0.976         |
+|    learning_rate        | 3e-05         |
+|    loss                 | 0.0289        |
+|    n_updates            | 90            |
+|    policy_gradient_loss | -0.025        |
+|    std                  | 0.135         |
+|    value_loss           | 0.000275      |
+| weights/                |               |
+|    AAPL                 | 0.25882497    |
+|    AMD                  | 0.12303592    |
+|    ASML                 | 0.040040407   |
+|    GOOG                 | 0.0870123     |
+|    MSFT                 | 0.32735148    |
+|    MU                   | 0.03780807    |
+|    NVDA                 | 0.12592684    |
+|    herfindahl           | 0.2157486     |
+|    max                  | 0.32735148    |
+|    min                  | 0.03780807    |
+|    std                  | 0.102044426   |
+|    turnover             | 0.5420152     |
+-------------------------------------------
+------------------------------------------
+| episode/                |              |
+|    drawdown             | 0.07678176   |
+|    portfolio_return     | -0.01300163  |
+|    portfolio_value      | 157241.6     |
+|    transaction_cost     | 0.0013464713 |
+| rollout/                |              |
+|    ep_len_mean          | 108          |
+|    ep_rew_mean          | 0.461        |
+| time/                   |              |
+|    fps                  | 1230         |
+|    iterations           | 11           |
+|    time_elapsed         | 18           |
+|    total_timesteps      | 22528        |
+| train/                  |              |
+|    approx_kl            | 0.013249051  |
+|    clip_fraction        | 0.144        |
+|    clip_range           | 0.2          |
+|    entropy_loss         | 7.15         |
+|    explained_variance   | 0.978        |
+|    learning_rate        | 3e-05        |
+|    loss                 | 0.0226       |
+|    n_updates            | 100          |
+|    policy_gradient_loss | -0.0263      |
+|    std                  | 0.135        |
+|    value_loss           | 0.000269     |
+| weights/                |              |
+|    AAPL                 | 0.018987695  |
+|    AMD                  | 0.143612     |
+|    ASML                 | 0.08955261   |
+|    GOOG                 | 0.10981178   |
+|    MSFT                 | 0.122865945  |
+|    MU                   | 0.40492144   |
+|    NVDA                 | 0.11024859   |
+|    herfindahl           | 0.23227543   |
+|    max                  | 0.40492144   |
+|    min                  | 0.018987695  |
+|    std                  | 0.11302227   |
+|    turnover             | 0.3911639    |
+------------------------------------------
+------------------------------------------
+| episode/                |              |
+|    drawdown             | 0.06605603   |
+|    portfolio_return     | -0.009354224 |
+|    portfolio_value      | 165005.06    |
+|    transaction_cost     | 0.001135376  |
+| rollout/                |              |
+|    ep_len_mean          | 108          |
+|    ep_rew_mean          | 0.485        |
+| time/                   |              |
+|    fps                  | 1234         |
+|    iterations           | 12           |
+|    time_elapsed         | 19           |
+|    total_timesteps      | 24576        |
+| train/                  |              |
+|    approx_kl            | 0.013366911  |
+|    clip_fraction        | 0.133        |
+|    clip_range           | 0.2          |
+|    entropy_loss         | 7.17         |
+|    explained_variance   | 0.982        |
+|    learning_rate        | 3e-05        |
+|    loss                 | 0.0534       |
+|    n_updates            | 110          |
+|    policy_gradient_loss | -0.0254      |
+|    std                  | 0.135        |
+|    value_loss           | 0.000244     |
+| weights/                |              |
+|    AAPL                 | 0.002802792  |
+|    AMD                  | 0.13556622   |
+|    ASML                 | 0.047678187  |
+|    GOOG                 | 0.109748214  |
+|    MSFT                 | 0.1657543    |
+|    MU                   | 0.11786184   |
+|    NVDA                 | 0.42058852   |
+|    herfindahl           | 0.25096455   |
+|    max                  | 0.42058852   |
+|    min                  | 0.002802792  |
+|    std                  | 0.12427354   |
+|    turnover             | 0.44466728   |
+------------------------------------------
+
+📊 Validation @ step 25000:
+   Sharpe: 0.312
+   Return: 0.0077
+   Drawdown: 0.0512
+   Win Rate: 0.00%
+------------------------------------------
+| episode/                |              |
+|    drawdown             | 0.079202205  |
+|    portfolio_return     | -0.013997896 |
+|    portfolio_value      | 155742.52    |
+|    transaction_cost     | 0.0008844616 |
+| eval/                   |              |
+|    episode_length       | 18           |
+|    final_value          | 100770.625   |
+|    max_drawdown         | 0.05121515   |
+|    mean_daily_return    | 0.000426489  |
+|    mean_turnover        | 0.11280424   |
+|    sharpe_ratio         | 0.312        |
+|    sortino_ratio        | nan          |
+|    total_return         | 0.0077062845 |
+|    volatility           | 0.344        |
+| rollout/                |              |
+|    ep_len_mean          | 108          |
+|    ep_rew_mean          | 0.503        |
+| time/                   |              |
+|    fps                  | 1236         |
+|    iterations           | 13           |
+|    time_elapsed         | 21           |
+|    total_timesteps      | 26624        |
+| train/                  |              |
+|    approx_kl            | 0.012161255  |
+|    clip_fraction        | 0.138        |
+|    clip_range           | 0.2          |
+|    entropy_loss         | 7.19         |
+|    explained_variance   | 0.977        |
+|    learning_rate        | 3e-05        |
+|    loss                 | 0.029        |
+|    n_updates            | 120          |
+|    policy_gradient_loss | -0.026       |
+|    std                  | 0.135        |
+|    value_loss           | 0.000368     |
+| weights/                |              |
+|    AAPL                 | 0.2032028    |
+|    AMD                  | 0.15504222   |
+|    ASML                 | 0.22518834   |
+|    GOOG                 | 0.0038275425 |
+|    MSFT                 | 0.17698802   |
+|    MU                   | 0.1357717    |
+|    NVDA                 | 0.09997938   |
+|    herfindahl           | 0.17580849   |
+|    max                  | 0.22518834   |
+|    min                  | 0.0038275425 |
+|    std                  | 0.06861003   |
+|    turnover             | 0.4862668    |
+------------------------------------------
+-------------------------------------------
+| episode/                |               |
+|    drawdown             | 0.06915724    |
+|    portfolio_return     | -0.011509995  |
+|    portfolio_value      | 179680.78     |
+|    transaction_cost     | 0.00086337206 |
+| rollout/                |               |
+|    ep_len_mean          | 108           |
+|    ep_rew_mean          | 0.527         |
+| time/                   |               |
+|    fps                  | 1236          |
+|    iterations           | 14            |
+|    time_elapsed         | 23            |
+|    total_timesteps      | 28672         |
+| train/                  |               |
+|    approx_kl            | 0.014421538   |
+|    clip_fraction        | 0.138         |
+|    clip_range           | 0.2           |
+|    entropy_loss         | 7.22          |
+|    explained_variance   | 0.981         |
+|    learning_rate        | 3e-05         |
+|    loss                 | 0.0406        |
+|    n_updates            | 130           |
+|    policy_gradient_loss | -0.0275       |
+|    std                  | 0.135         |
+|    value_loss           | 0.00028       |
+| weights/                |               |
+|    AAPL                 | 0.18873169    |
+|    AMD                  | 0.066752926   |
+|    ASML                 | 0.18390143    |
+|    GOOG                 | 0.025602555   |
+|    MSFT                 | 0.111237094   |
+|    MU                   | 0.20126285    |
+|    NVDA                 | 0.22251147    |
+|    herfindahl           | 0.1769426     |
+|    max                  | 0.22251147    |
+|    min                  | 0.025602555   |
+|    std                  | 0.06978074    |
+|    turnover             | 0.4183918     |
+-------------------------------------------
+
+📊 Validation @ step 30000:
+   Sharpe: 0.345
+   Return: 0.0086
+   Drawdown: 0.0510
+   Win Rate: 0.00%
+-------------------------------------------
+| episode/                |               |
+|    drawdown             | 0.062365953   |
+|    portfolio_return     | -0.007511821  |
+|    portfolio_value      | 181647.14     |
+|    transaction_cost     | 0.0012124472  |
+| eval/                   |               |
+|    episode_length       | 18            |
+|    final_value          | 100859.875    |
+|    max_drawdown         | 0.051000934   |
+|    mean_daily_return    | 0.00047566416 |
+|    mean_turnover        | 0.115490064   |
+|    sharpe_ratio         | 0.345         |
+|    sortino_ratio        | nan           |
+|    total_return         | 0.008598685   |
+|    volatility           | 0.347         |
+| rollout/                |               |
+|    ep_len_mean          | 108           |
+|    ep_rew_mean          | 0.554         |
+| time/                   |               |
+|    fps                  | 1237          |
+|    iterations           | 15            |
+|    time_elapsed         | 24            |
+|    total_timesteps      | 30720         |
+| train/                  |               |
+|    approx_kl            | 0.01364793    |
+|    clip_fraction        | 0.134         |
+|    clip_range           | 0.2           |
+|    entropy_loss         | 7.25          |
+|    explained_variance   | 0.981         |
+|    learning_rate        | 3e-05         |
+|    loss                 | 0.068         |
+|    n_updates            | 140           |
+|    policy_gradient_loss | -0.0259       |
+|    std                  | 0.135         |
+|    value_loss           | 0.000322      |
+| weights/                |               |
+|    AAPL                 | 0.00370915    |
+|    AMD                  | 0.105242714   |
+|    ASML                 | 0.08400348    |
+|    GOOG                 | 0.045454584   |
+|    MSFT                 | 0.2247327     |
+|    MU                   | 0.20721675    |
+|    NVDA                 | 0.3296407     |
+|    herfindahl           | 0.22231904    |
+|    max                  | 0.3296407     |
+|    min                  | 0.00370915    |
+|    std                  | 0.106544346   |
+|    turnover             | 0.27105927    |
+-------------------------------------------
+------------------------------------------
+| episode/                |              |
+|    drawdown             | 0.07549108   |
+|    portfolio_return     | -0.00978779  |
+|    portfolio_value      | 186126.28    |
+|    transaction_cost     | 0.0015665968 |
+| rollout/                |              |
+|    ep_len_mean          | 108          |
+|    ep_rew_mean          | 0.573        |
+| time/                   |              |
+|    fps                  | 1239         |
+|    iterations           | 16           |
+|    time_elapsed         | 26           |
+|    total_timesteps      | 32768        |
+| train/                  |              |
+|    approx_kl            | 0.011434505  |
+|    clip_fraction        | 0.115        |
+|    clip_range           | 0.2          |
+|    entropy_loss         | 7.28         |
+|    explained_variance   | 0.978        |
+|    learning_rate        | 3e-05        |
+|    loss                 | 0.0822       |
+|    n_updates            | 150          |
+|    policy_gradient_loss | -0.023       |
+|    std                  | 0.135        |
+|    value_loss           | 0.000428     |
+| weights/                |              |
+|    AAPL                 | 0.020926962  |
+|    AMD                  | 0.014557151  |
+|    ASML                 | 0.0919071    |
+|    GOOG                 | 0.09930646   |
+|    MSFT                 | 0.0781614    |
+|    MU                   | 0.5187426    |
+|    NVDA                 | 0.17639838   |
+|    herfindahl           | 0.32527804   |
+|    max                  | 0.5187426    |
+|    min                  | 0.014557151  |
+|    std                  | 0.16143149   |
+|    turnover             | 0.4890539    |
+------------------------------------------
+------------------------------------------
+| episode/                |              |
+|    drawdown             | 0.06811091   |
+|    portfolio_return     | -0.012922335 |
+|    portfolio_value      | 195980.25    |
+|    transaction_cost     | 0.0011004875 |
+| rollout/                |              |
+|    ep_len_mean          | 108          |
+|    ep_rew_mean          | 0.598        |
+| time/                   |              |
+|    fps                  | 1238         |
+|    iterations           | 17           |
+|    time_elapsed         | 28           |
+|    total_timesteps      | 34816        |
+| train/                  |              |
+|    approx_kl            | 0.013304108  |
+|    clip_fraction        | 0.149        |
+|    clip_range           | 0.2          |
+|    entropy_loss         | 7.33         |
+|    explained_variance   | 0.983        |
+|    learning_rate        | 3e-05        |
+|    loss                 | 0.0118       |
+|    n_updates            | 160          |
+|    policy_gradient_loss | -0.0268      |
+|    std                  | 0.135        |
+|    value_loss           | 0.000307     |
+| weights/                |              |
+|    AAPL                 | 0.11113404   |
+|    AMD                  | 0.13950782   |
+|    ASML                 | 0.13114199   |
+|    GOOG                 | 0.061721355  |
+|    MSFT                 | 0.058078617  |
+|    MU                   | 0.23528576   |
+|    NVDA                 | 0.26313043   |
+|    herfindahl           | 0.1807911    |
+|    max                  | 0.26313043   |
+|    min                  | 0.058078617  |
+|    std                  | 0.07361477   |
+|    turnover             | 0.2669022    |
+------------------------------------------
+
+📊 Validation @ step 35000:
+   Sharpe: 0.353
+   Return: 0.0090
+   Drawdown: 0.0520
+   Win Rate: 0.00%
+------------------------------------------
+| episode/                |              |
+|    drawdown             | 0.07297836   |
+|    portfolio_return     | -0.012342468 |
+|    portfolio_value      | 185305.08    |
+|    transaction_cost     | 0.0015909213 |
+| eval/                   |              |
+|    episode_length       | 18           |
+|    final_value          | 100901.04    |
+|    max_drawdown         | 0.05201636   |
+|    mean_daily_return    | 0.0004983344 |
+|    mean_turnover        | 0.12778744   |
+|    sharpe_ratio         | 0.353        |
+|    sortino_ratio        | nan          |
+|    total_return         | 0.009010315  |
+|    volatility           | 0.356        |
+| rollout/                |              |
+|    ep_len_mean          | 108          |
+|    ep_rew_mean          | 0.626        |
+| time/                   |              |
+|    fps                  | 1236         |
+|    iterations           | 18           |
+|    time_elapsed         | 29           |
+|    total_timesteps      | 36864        |
+| train/                  |              |
+|    approx_kl            | 0.011790587  |
+|    clip_fraction        | 0.128        |
+|    clip_range           | 0.2          |
+|    entropy_loss         | 7.36         |
+|    explained_variance   | 0.984        |
+|    learning_rate        | 3e-05        |
+|    loss                 | 0.0472       |
+|    n_updates            | 170          |
+|    policy_gradient_loss | -0.0243      |
+|    std                  | 0.135        |
+|    value_loss           | 0.000327     |
+| weights/                |              |
+|    AAPL                 | 0.07664164   |
+|    AMD                  | 0.041687332  |
+|    ASML                 | 0.32501018   |
+|    GOOG                 | 0.1021948    |
+|    MSFT                 | 0.2460787    |
+|    MU                   | 0.12837821   |
+|    NVDA                 | 0.080009095  |
+|    herfindahl           | 0.20712432   |
+|    max                  | 0.32501018   |
+|    min                  | 0.041687332  |
+|    std                  | 0.09581767   |
+|    turnover             | 0.29677546   |
+------------------------------------------
+-------------------------------------------
+| episode/                |               |
+|    drawdown             | 0.0722313     |
+|    portfolio_return     | -0.0036858472 |
+|    portfolio_value      | 200010.61     |
+|    transaction_cost     | 0.0013976712  |
+| rollout/                |               |
+|    ep_len_mean          | 108           |
+|    ep_rew_mean          | 0.653         |
+| time/                   |               |
+|    fps                  | 1237          |
+|    iterations           | 19            |
+|    time_elapsed         | 31            |
+|    total_timesteps      | 38912         |
+| train/                  |               |
+|    approx_kl            | 0.014532877   |
+|    clip_fraction        | 0.142         |
+|    clip_range           | 0.2           |
+|    entropy_loss         | 7.4           |
+|    explained_variance   | 0.982         |
+|    learning_rate        | 3e-05         |
+|    loss                 | 0.0333        |
+|    n_updates            | 180           |
+|    policy_gradient_loss | -0.0269       |
+|    std                  | 0.135         |
+|    value_loss           | 0.000428      |
+| weights/                |               |
+|    AAPL                 | 0.06534843    |
+|    AMD                  | 0.004300932   |
+|    ASML                 | 0.04932218    |
+|    GOOG                 | 0.014050277   |
+|    MSFT                 | 0.58250594    |
+|    MU                   | 0.2246109     |
+|    NVDA                 | 0.059861347   |
+|    herfindahl           | 0.40026563    |
+|    max                  | 0.58250594    |
+|    min                  | 0.004300932   |
+|    std                  | 0.19176193    |
+|    turnover             | 0.686799      |
+-------------------------------------------
+/Users/nataliamarko/miniconda3/envs/demand_forecast_env/lib/python3.12/site-packages/stable_baselines3/common/save_util.py:284: UserWarning: Path 'models/fold_0/checkpoints' does not exist. Will create it.
+  warnings.warn(f"Path '{path.parent}' does not exist. Will create it.")
+
+📊 Validation @ step 40000:
+   Sharpe: 0.370
+   Return: 0.0095
+   Drawdown: 0.0519
+   Win Rate: 0.00%
+-------------------------------------------
+| episode/                |               |
+|    drawdown             | 0.06281801    |
+|    portfolio_return     | -0.0053183218 |
+|    portfolio_value      | 212907.67     |
+|    transaction_cost     | 0.0005976098  |
+| eval/                   |               |
+|    episode_length       | 18            |
+|    final_value          | 100952.4      |
+|    max_drawdown         | 0.051945243   |
+|    mean_daily_return    | 0.00052659074 |
+|    mean_turnover        | 0.13402605    |
+|    sharpe_ratio         | 0.37          |
+|    sortino_ratio        | nan           |
+|    total_return         | 0.009523749   |
+|    volatility           | 0.359         |
+| rollout/                |               |
+|    ep_len_mean          | 108           |
+|    ep_rew_mean          | 0.675         |
+| time/                   |               |
+|    fps                  | 1237          |
+|    iterations           | 20            |
+|    time_elapsed         | 33            |
+|    total_timesteps      | 40960         |
+| train/                  |               |
+|    approx_kl            | 0.011411664   |
+|    clip_fraction        | 0.136         |
+|    clip_range           | 0.2           |
+|    entropy_loss         | 7.43          |
+|    explained_variance   | 0.984         |
+|    learning_rate        | 3e-05         |
+|    loss                 | 0.0256        |
+|    n_updates            | 190           |
+|    policy_gradient_loss | -0.0245       |
+|    std                  | 0.135         |
+|    value_loss           | 0.000342      |
+| weights/                |               |
+|    AAPL                 | 3.7352063e-05 |
+|    AMD                  | 0.0961101     |
+|    ASML                 | 0.16720065    |
+|    GOOG                 | 0.020841226   |
+|    MSFT                 | 0.3777657     |
+|    MU                   | 0.02901598    |
+|    NVDA                 | 0.309029      |
+|    herfindahl           | 0.27667537    |
+|    max                  | 0.3777657     |
+|    min                  | 3.7352063e-05 |
+|    std                  | 0.13826382    |
+|    turnover             | 0.3977256     |
+-------------------------------------------
+------------------------------------------
+| episode/                |              |
+|    drawdown             | 0.06545056   |
+|    portfolio_return     | -0.00891873  |
+|    portfolio_value      | 194060.16    |
+|    transaction_cost     | 0.0013894605 |
+| rollout/                |              |
+|    ep_len_mean          | 108          |
+|    ep_rew_mean          | 0.701        |
+| time/                   |              |
+|    fps                  | 1238         |
+|    iterations           | 21           |
+|    time_elapsed         | 34           |
+|    total_timesteps      | 43008        |
+| train/                  |              |
+|    approx_kl            | 0.014474327  |
+|    clip_fraction        | 0.159        |
+|    clip_range           | 0.2          |
+|    entropy_loss         | 7.49         |
+|    explained_variance   | 0.99         |
+|    learning_rate        | 3e-05        |
+|    loss                 | 0.0483       |
+|    n_updates            | 200          |
+|    policy_gradient_loss | -0.0295      |
+|    std                  | 0.135        |
+|    value_loss           | 0.00027      |
+| weights/                |              |
+|    AAPL                 | 0.011128679  |
+|    AMD                  | 0.11250139   |
+|    ASML                 | 0.08195059   |
+|    GOOG                 | 0.092363484  |
+|    MSFT                 | 0.421478     |
+|    MU                   | 0.19367115   |
+|    NVDA                 | 0.08690671   |
+|    herfindahl           | 0.2507323    |
+|    max                  | 0.421478     |
+|    min                  | 0.011128679  |
+|    std                  | 0.124139994  |
+|    turnover             | 0.48813373   |
+------------------------------------------
+
+📊 Validation @ step 45000:
+   Sharpe: 0.385
+   Return: 0.0100
+   Drawdown: 0.0516
+   Win Rate: 0.00%
+------------------------------------------
+| episode/                |              |
+|    drawdown             | 0.07536639   |
+|    portfolio_return     | -0.017257368 |
+|    portfolio_value      | 258515.97    |
+|    transaction_cost     | 0.0010784301 |
+| eval/                   |              |
+|    episode_length       | 18           |
+|    final_value          | 100998.125   |
+|    max_drawdown         | 0.05162487   |
+|    mean_daily_return    | 0.0005517721 |
+|    mean_turnover        | 0.1460422    |
+|    sharpe_ratio         | 0.385        |
+|    sortino_ratio        | nan          |
+|    total_return         | 0.009981394  |
+|    volatility           | 0.361        |
+| rollout/                |              |
+|    ep_len_mean          | 108          |
+|    ep_rew_mean          | 0.724        |
+| time/                   |              |
+|    fps                  | 1240         |
+|    iterations           | 22           |
+|    time_elapsed         | 36           |
+|    total_timesteps      | 45056        |
+| train/                  |              |
+|    approx_kl            | 0.0138201695 |
+|    clip_fraction        | 0.145        |
+|    clip_range           | 0.2          |
+|    entropy_loss         | 7.53         |
+|    explained_variance   | 0.989        |
+|    learning_rate        | 3e-05        |
+|    loss                 | 0.0298       |
+|    n_updates            | 210          |
+|    policy_gradient_loss | -0.0278      |
+|    std                  | 0.135        |
+|    value_loss           | 0.000294     |
+| weights/                |              |
+|    AAPL                 | 0.038285747  |
+|    AMD                  | 0.32154799   |
+|    ASML                 | 0.020721395  |
+|    GOOG                 | 0.14047393   |
+|    MSFT                 | 0.20557919   |
+|    MU                   | 0.21513407   |
+|    NVDA                 | 0.05825775   |
+|    herfindahl           | 0.21696064   |
+|    max                  | 0.32154799   |
+|    min                  | 0.020721395  |
+|    std                  | 0.102889314  |
+|    turnover             | 0.2939356    |
+------------------------------------------
+------------------------------------------
+| episode/                |              |
+|    drawdown             | 0.0657405    |
+|    portfolio_return     | -0.006304487 |
+|    portfolio_value      | 224166.52    |
+|    transaction_cost     | 0.0014014011 |
+| rollout/                |              |
+|    ep_len_mean          | 108          |
+|    ep_rew_mean          | 0.748        |
+| time/                   |              |
+|    fps                  | 1240         |
+|    iterations           | 23           |
+|    time_elapsed         | 37           |
+|    total_timesteps      | 47104        |
+| train/                  |              |
+|    approx_kl            | 0.010794572  |
+|    clip_fraction        | 0.119        |
+|    clip_range           | 0.2          |
+|    entropy_loss         | 7.59         |
+|    explained_variance   | 0.986        |
+|    learning_rate        | 3e-05        |
+|    loss                 | 0.0493       |
+|    n_updates            | 220          |
+|    policy_gradient_loss | -0.0232      |
+|    std                  | 0.135        |
+|    value_loss           | 0.00038      |
+| weights/                |              |
+|    AAPL                 | 0.11154674   |
+|    AMD                  | 0.046625692  |
+|    ASML                 | 0.02698819   |
+|    GOOG                 | 0.018309303  |
+|    MSFT                 | 0.2554599    |
+|    MU                   | 0.15659212   |
+|    NVDA                 | 0.384478     |
+|    herfindahl           | 0.2532844    |
+|    max                  | 0.384478     |
+|    min                  | 0.018309303  |
+|    std                  | 0.12559986   |
+|    turnover             | 0.26675642   |
+------------------------------------------
+------------------------------------------
+| episode/                |              |
+|    drawdown             | 0.063999265  |
+|    portfolio_return     | -0.003910443 |
+|    portfolio_value      | 225905.77    |
+|    transaction_cost     | 0.0010651145 |
+| rollout/                |              |
+|    ep_len_mean          | 108          |
+|    ep_rew_mean          | 0.775        |
+| time/                   |              |
+|    fps                  | 1241         |
+|    iterations           | 24           |
+|    time_elapsed         | 39           |
+|    total_timesteps      | 49152        |
+| train/                  |              |
+|    approx_kl            | 0.012467063  |
+|    clip_fraction        | 0.126        |
+|    clip_range           | 0.2          |
+|    entropy_loss         | 7.64         |
+|    explained_variance   | 0.988        |
+|    learning_rate        | 3e-05        |
+|    loss                 | 0.0523       |
+|    n_updates            | 230          |
+|    policy_gradient_loss | -0.0252      |
+|    std                  | 0.135        |
+|    value_loss           | 0.000309     |
+| weights/                |              |
+|    AAPL                 | 0.004953548  |
+|    AMD                  | 0.105655804  |
+|    ASML                 | 0.059592634  |
+|    GOOG                 | 0.017292365  |
+|    MSFT                 | 0.6116922    |
+|    MU                   | 0.029832296  |
+|    NVDA                 | 0.17098117   |
+|    herfindahl           | 0.41932985   |
+|    max                  | 0.6116922    |
+|    min                  | 0.004953548  |
+|    std                  | 0.19873627   |
+|    turnover             | 0.2855394    |
+------------------------------------------
+
+📊 Validation @ step 50000:
+   Sharpe: 0.325
+   Return: 0.0086
+   Drawdown: 0.0531
+   Win Rate: 0.00%
+------------------------------------------
+| episode/                |              |
+|    drawdown             | 0.06978398   |
+|    portfolio_return     | -0.008771199 |
+|    portfolio_value      | 216826.83    |
+|    transaction_cost     | 0.0008473635 |
+| eval/                   |              |
+|    episode_length       | 18           |
+|    final_value          | 100863.58    |
+|    max_drawdown         | 0.05308381   |
+|    mean_daily_return    | 0.0004777174 |
+|    mean_turnover        | 0.16555387   |
+|    sharpe_ratio         | 0.325        |
+|    sortino_ratio        | nan          |
+|    total_return         | 0.008635998  |
+|    volatility           | 0.37         |
+| rollout/                |              |
+|    ep_len_mean          | 108          |
+|    ep_rew_mean          | 0.801        |
+| time/                   |              |
+|    fps                  | 1241         |
+|    iterations           | 25           |
+|    time_elapsed         | 41           |
+|    total_timesteps      | 51200        |
+| train/                  |              |
+|    approx_kl            | 0.013057129  |
+|    clip_fraction        | 0.142        |
+|    clip_range           | 0.2          |
+|    entropy_loss         | 7.7          |
+|    explained_variance   | 0.988        |
+|    learning_rate        | 3e-05        |
+|    loss                 | 0.0482       |
+|    n_updates            | 240          |
+|    policy_gradient_loss | -0.026       |
+|    std                  | 0.135        |
+|    value_loss           | 0.000319     |
+| weights/                |              |
+|    AAPL                 | 0.0040383665 |
+|    AMD                  | 0.101940446  |
+|    ASML                 | 0.21568426   |
+|    GOOG                 | 0.051031627  |
+|    MSFT                 | 0.07989347   |
+|    MU                   | 0.09839602   |
+|    NVDA                 | 0.44901583   |
+|    herfindahl           | 0.27721205   |
+|    max                  | 0.44901583   |
+|    min                  | 0.0040383665 |
+|    std                  | 0.1385408    |
+|    turnover             | 0.5062706    |
+------------------------------------------
+ 100% ━━━━━━━━━━━━━━━━━━━━━━━━ 51,200/50,000  [ 0:00:40 < 0:00:00 , 1,248 it/s ]
+
+✅ Training completed in 41.67 seconds
+Final model saved: models/fold_0/ppo_fold_0_final.zip
+
+📊 Running comprehensive evaluation...
+
+Evaluating on train set...
+
+📊 Data Validation - Forward Returns (0, train):
+   Mean: 0.004207 (0.4216% simple)
+   Std:  0.027696
+   Range: [-0.0974, 0.1527]
+   Max |return|: 0.1527 (16.5% simple)
+   ✅ Data looks reasonable
+
+  Sharpe Ratio: 5.737
+  Total Return: 1.6080
+  Max Drawdown: 0.0678
+  Win Rate: 0.00%
+
+Evaluating on val set...
+
+📊 Data Validation - Forward Returns (0, val):
+   Mean: 0.000557 (0.0558% simple)
+   Std:  0.026444
+   Range: [-0.0768, 0.0652]
+   Max |return|: 0.0768 (8.0% simple)
+   ✅ Data looks reasonable
+
+  Sharpe Ratio: 0.300
+  Total Return: 0.0080
+  Max Drawdown: 0.0540
+  Win Rate: 0.00%
+  ⚠️ Overfitting detected: Train-Val gap = 5.437
+
+Evaluating on test set...
+
+📊 Data Validation - Forward Returns (0, test):
+   Mean: -0.006076 (-0.6058% simple)
+   Std:  0.028992
+   Range: [-0.0414, 0.0518]
+   Max |return|: 0.0518 (5.3% simple)
+
+⚠️  Data Quality Warnings:
+   - Non-zero mean return (-153.1% annualized)
+
+  Sharpe Ratio: -3.141
+  Total Return: -0.0162
+  Max Drawdown: 0.0173
+  Win Rate: 0.00%
+
+Training info saved: models/fold_0/training_info.json
+
+================================================================================
+✅ TRAINING COMPLETE
+================================================================================
+
+TRAIN Results:
+  Sharpe: 5.737
+  Return: 1.6080
+  Drawdown: 0.0678
+
+VAL Results:
+  Sharpe: 0.300
+  Return: 0.0080
+  Drawdown: 0.0540
+
+TEST Results:
+  Sharpe: -3.141
+  Return: -0.0162
+  Drawdown: 0.0173
+================================================================================

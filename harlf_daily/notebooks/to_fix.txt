@@ -1,0 +1,27 @@
+1) portfolio_env.py 	Implement benchmark tracking (Line ~236): # Load actual QQQ returns instead of returning 0.0
+self.benchmark_returns = load_benchmark_data('QQQ') - check if make sense
+2) ent_coef=0.001 ⚠️ (too low, increase to 0.01) - check
+n_steps=2048 ⚠️ (may be too high, check the best architecture for my concreed data architecture
+Gamma 0.985 (daily horizon)  -check if make sence
+tisk free rate should be 4%
+3) Implement position sizing constraints (max 30% per asset)
+5) Sortino Ratio Bug - Division by near-zero downside deviation
+6) check if rewards are normalized ???
+7) can we implement : adaptive target Sharpe that normalizes rewards to ~1.0 at target performance. This prevents reward scale drift across different market regimes and leads to more stable training.
+        1. Initialize: ema_return = r₀, ema_return_sq = r₀²
+        2. Each step:
+        • ema_return ← (1-α) × ema_return + α × r_t
+        • ema_return_sq ← (1-α) × ema_return_sq + α × r_t²
+        • ema_variance = ema_return_sq - ema_return²
+        • sharpe_annual = [(ema_return - rf) / √ema_variance] × √52
+        3. If adaptive_target (after 10 steps):
+        • target_sharpe adapts toward observed Sharpe (clipped 0.5-4.0)
+        4. Return: reward = sharpe_annual / target_sharpe
+
+                🔑 Key Feature - Adaptive Target:
+            •	Normalizes reward to ~1.0 at target Sharpe
+            •	Prevents reward scale drift across market regimes
+            •	Target persists across episodes (learns over time)
+            •	More stable training than raw Sharpe (daily’s approach)
+
+8) early stopping - i think we over fitting the models
