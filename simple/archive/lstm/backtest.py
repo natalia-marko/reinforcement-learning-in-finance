@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sb3_contrib import RecurrentPPO
 from core.rl_system import PortfolioEnv
-from core.data_eng_simple import create_features_no_leakage, get_lean_features
+from archive.data_eng_simple import create_features_no_leakage, get_lean_features
 from core.config import *
 
 from core.data_eng_expanded import create_expanded_features
