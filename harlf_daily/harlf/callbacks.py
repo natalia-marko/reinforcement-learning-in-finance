@@ -439,7 +439,13 @@ class EarlyStoppingCallback(BaseCallback):
         # Check overfitting (if train metrics available)
         if self.check_overfitting:
             # Try to find corresponding train metric
-            train_metric_key = metric_key.replace('eval/', 'train/').replace('validation/', 'train/')
+            # Standardize: eval/sharpe_ratio -> train/sharpe_ratio
+            if 'eval/' in metric_key:
+                train_metric_key = metric_key.replace('eval/', 'train/')
+            elif 'validation/' in metric_key:
+                train_metric_key = metric_key.replace('validation/', 'train/')
+            else:
+                train_metric_key = f"train/{metric_key}"
 
             if train_metric_key in self.model.logger.name_to_value:
                 train_val = self.model.logger.name_to_value[train_metric_key]

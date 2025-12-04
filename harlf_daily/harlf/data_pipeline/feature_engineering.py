@@ -510,10 +510,11 @@ def engineer_features_for_ticker(ticker, raw_data, benchmark_returns, macro_feat
     if 'volatility_63d' in features.columns:
         features = features.drop('volatility_63d', axis=1)
 
-    # ✅ CRITICAL FIX: LAG ALL FEATURES by 1 period BEFORE adding targets
-    # This prevents look-ahead bias: features from t-1 predict returns from t to t+1
-    config.log(f"  Lagging all features by 1 period (prevent look-ahead bias)...")
-    features_lagged = features.shift(1)
+    # ✅ FIXED: Do NOT lag features here.
+    # We assume the agent trades at Close of day t, using data up to Close of day t.
+    # The target is the return from Close t to Close t+1.
+    config.log(f"  Using features at time t to predict returns t->t+1...")
+    features_lagged = features.copy()
 
     # ✅ Add forward returns WITHOUT lagging (these are targets, not features)
     # features_lagged[t-1] will predict forward_log_return[t→t+1]

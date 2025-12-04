@@ -412,7 +412,11 @@ class PortfolioEnv(gym.Env):
         self.episode_turnovers.append(turnover)
 
         # Update state
-        self.current_weights = action
+        # ✅ FIXED: Update weights to reflect price drift
+        # w_{t+1} = w_t * (1 + r_t) / (1 + R_p)
+        # This ensures next step's transaction costs are accurate
+        drifted_weights = action * (1.0 + asset_simple_returns) / (1.0 + portfolio_simple_return_gross)
+        self.current_weights = drifted_weights / drifted_weights.sum()  # Renormalize to be safe
         self.current_step += 1
 
         # Check termination conditions
