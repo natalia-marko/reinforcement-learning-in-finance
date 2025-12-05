@@ -1,0 +1,24 @@
+# Data & Feature Engineering
+yfinance>=0.2.40
+pandas>=2.0.0
+numpy>=1.24.0
+pandas-ta>=0.3.14
+
+# Reinforcement Learning
+stable-baselines3>=2.3.0
+gymnasium>=0.29.0
+torch>=2.0.0
+
+# Notifications
+requests>=2.31.0
+python-telegram-bot>=20.0
+
+# Development & Local Testing
+python-dotenv>=1.0.0
+
+# Optional: Training & Analysis (not needed for production)
+# Uncomment if you need to retrain models or analyze performance
+# optuna>=3.5.0
+# matplotlib>=3.7.0
+# seaborn>=0.12.0
+# jinja2>=3.0.0

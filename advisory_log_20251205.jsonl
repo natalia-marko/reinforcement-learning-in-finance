@@ -1,0 +1,38 @@
+{"timestamp": "2025-12-05T12:38:33.771838", "event": "advisor_run_start", "version": "1.0", "assets": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG"], "config": {"fast_vol_threshold": 0.0177, "slow_vol_threshold": 0.0378, "inertia_threshold": 0.0286}}
+{"timestamp": "2025-12-05T12:38:34.370069", "event": "data_fetch_success", "tickers": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG", "QQQ"]}
+{"timestamp": "2025-12-05T12:38:34.380666", "event": "features_generated", "feature_shape": [502, 7, 3], "observation_window_shape": [60, 7, 3]}
+{"timestamp": "2025-12-05T12:39:58.500104", "event": "advisor_run_start", "version": "1.0", "assets": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG"], "config": {"fast_vol_threshold": 0.0177, "slow_vol_threshold": 0.0378, "inertia_threshold": 0.0286}}
+{"timestamp": "2025-12-05T12:39:58.997917", "event": "data_fetch_success", "tickers": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG", "QQQ"]}
+{"timestamp": "2025-12-05T12:39:59.006792", "event": "features_generated", "feature_shape": [502, 7, 3], "observation_window_shape": [60, 7, 3]}
+{"timestamp": "2025-12-05T12:40:40.611889", "event": "advisor_run_start", "version": "1.0", "assets": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG"], "config": {"fast_vol_threshold": 0.0177, "slow_vol_threshold": 0.0378, "inertia_threshold": 0.0286}}
+{"timestamp": "2025-12-05T12:40:41.164386", "event": "data_fetch_success", "tickers": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG", "QQQ"]}
+{"timestamp": "2025-12-05T12:40:41.173037", "event": "features_generated", "feature_shape": [502, 7, 3], "observation_window_shape": [60, 7, 3]}
+{"timestamp": "2025-12-05T12:40:41.769827", "event": "prediction_generated", "regime": "CHOPPY (Mixed Allocation)", "target_weights": [0.13674359023571014, 0.11553369462490082, 0.14067396521568298, 0.12433050572872162, 0.12087755650281906, 0.11590677499771118, 0.11136073619127274, 0.13457316160202026], "vol_fast": 0.005133216861916268, "vol_slow": 0.012691139772468711}
+{"timestamp": "2025-12-05T12:40:41.770065", "event": "advisor_run_complete", "decision": "REBALANCE", "turnover": 0.23049426853656774, "threshold": 0.0286}
+{"timestamp": "2025-12-05T12:44:52.014534", "event": "advisor_run_start", "version": "1.0", "assets": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG"], "config": {"fast_vol_threshold": 0.0177, "slow_vol_threshold": 0.0378, "inertia_threshold": 0.0286}}
+{"timestamp": "2025-12-05T12:44:52.572283", "event": "data_fetch_success", "tickers": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG", "QQQ"]}
+{"timestamp": "2025-12-05T12:44:52.582660", "event": "features_generated", "feature_shape": [502, 7, 3], "observation_window_shape": [60, 7, 3]}
+{"timestamp": "2025-12-05T12:44:53.240832", "event": "prediction_generated", "regime": "CHOPPY (Mixed Allocation)", "target_weights": [0.13674359023571014, 0.11553370207548141, 0.1406739354133606, 0.12433050572872162, 0.12087757885456085, 0.11590676009654999, 0.11136072129011154, 0.13457319140434265], "vol_fast": 0.005133216861916268, "vol_slow": 0.012691139772468711}
+{"timestamp": "2025-12-05T12:44:53.240989", "event": "advisor_run_complete", "decision": "REBALANCE", "turnover": 0.23049426853656774, "threshold": 0.0286}
+{"timestamp": "2025-12-05T12:45:44.871327", "event": "advisor_run_start", "version": "1.0", "assets": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG"], "config": {"fast_vol_threshold": 0.0177, "slow_vol_threshold": 0.0378, "inertia_threshold": 0.0286}}
+{"timestamp": "2025-12-05T12:45:45.388623", "event": "data_fetch_success", "tickers": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG", "QQQ"]}
+{"timestamp": "2025-12-05T12:45:45.395864", "event": "features_generated", "feature_shape": [502, 7, 3], "observation_window_shape": [60, 7, 3]}
+{"timestamp": "2025-12-05T12:45:45.952678", "event": "prediction_generated", "regime": "CHOPPY (Mixed Allocation)", "target_weights": [0.13674360513687134, 0.11553370207548141, 0.1406739503145218, 0.12433050572872162, 0.12087756395339966, 0.11590676009654999, 0.11136072874069214, 0.13457319140434265], "vol_fast": 0.005133216861916268, "vol_slow": 0.012691139772468711}
+{"timestamp": "2025-12-05T12:45:46.072466", "event": "advisor_run_complete", "decision": "REBALANCE", "turnover": 0.23049427598714833, "threshold": 0.0286}
+{"timestamp": "2025-12-05T12:46:18.515826", "event": "advisor_run_start", "version": "1.0", "assets": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG"], "config": {"fast_vol_threshold": 0.0177, "slow_vol_threshold": 0.0378, "inertia_threshold": 0.0286}}
+
+2 Failed downloads:
+['AMD']: Timeout('Failed to perform, curl: (28) Operation timed out after 10001 milliseconds with 0 bytes received. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.')
+['MSFT']: Timeout('Failed to perform, curl: (28) Connection timed out after 10002 milliseconds. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.')
+{"timestamp": "2025-12-05T12:46:28.746163", "event": "data_fetch_success", "tickers": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG", "QQQ"]}
+{"timestamp": "2025-12-05T12:46:28.747348", "event": "empty_dataframe"}
+{"timestamp": "2025-12-05T12:47:04.471364", "event": "advisor_run_start", "version": "1.0", "assets": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG"], "config": {"fast_vol_threshold": 0.0177, "slow_vol_threshold": 0.0378, "inertia_threshold": 0.0286}}
+{"timestamp": "2025-12-05T12:47:05.102756", "event": "data_fetch_success", "tickers": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG", "QQQ"]}
+{"timestamp": "2025-12-05T12:47:05.113100", "event": "features_generated", "feature_shape": [502, 7, 3], "observation_window_shape": [60, 7, 3]}
+{"timestamp": "2025-12-05T12:47:05.684544", "event": "prediction_generated", "regime": "CHOPPY (Mixed Allocation)", "target_weights": [0.13674360513687134, 0.11553371697664261, 0.1406739205121994, 0.12433050572872162, 0.12087757885456085, 0.11590676009654999, 0.11136072874069214, 0.13457317650318146], "vol_fast": 0.005133216861916268, "vol_slow": 0.012691139772468711}
+{"timestamp": "2025-12-05T12:47:05.870997", "event": "advisor_run_complete", "decision": "REBALANCE", "turnover": 0.23049420148134236, "threshold": 0.0286}
+{"timestamp": "2025-12-05T13:39:14.666031", "event": "advisor_run_start", "version": "1.0", "assets": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG"], "config": {"fast_vol_threshold": 0.0177, "slow_vol_threshold": 0.0378, "inertia_threshold": 0.0286}}
+{"timestamp": "2025-12-05T13:39:15.161271", "event": "data_fetch_success", "tickers": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG", "QQQ"]}
+{"timestamp": "2025-12-05T13:39:15.170087", "event": "features_generated", "feature_shape": [502, 7, 3], "observation_window_shape": [60, 7, 3]}
+{"timestamp": "2025-12-05T13:39:15.769513", "event": "prediction_generated", "regime": "CHOPPY (Mixed Allocation)", "target_weights": [0.137, 0.116, 0.141, 0.124, 0.121, 0.116, 0.111, 0.135], "vol_fast": 0.0051, "vol_slow": 0.0127}
+{"timestamp": "2025-12-05T13:39:15.906499", "event": "advisor_run_complete", "decision": "REBALANCE", "turnover": 0.2305, "threshold": 0.0286}

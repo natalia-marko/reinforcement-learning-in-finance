@@ -1,0 +1,12 @@
+{"timestamp": "2025-12-05T12:43:19.122164", "event": "advisor_run_start", "version": "1.0", "assets": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG"], "config": {"fast_vol_threshold": 0.0177, "slow_vol_threshold": 0.0378, "inertia_threshold": 0.0286}}
+{"timestamp": "2025-12-05T12:43:20.139899", "event": "data_fetch_success", "tickers": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG", "QQQ"]}
+{"timestamp": "2025-12-05T12:43:21.235600", "event": "features_generated", "feature_shape": [502, 7, 3], "observation_window_shape": [60, 7, 3]}
+{"timestamp": "2025-12-05T12:46:14.917539", "event": "advisor_run_start", "version": "1.0", "assets": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG"], "config": {"fast_vol_threshold": 0.0177, "slow_vol_threshold": 0.0378, "inertia_threshold": 0.0286}}
+
+2 Failed downloads:
+['AMD', 'MSFT']: Timeout('Failed to perform, curl: (28) Connection timed out after 10002 milliseconds. See https://curl.se/libcurl/c/libcurl-errors.html first for more details.')
+{"timestamp": "2025-12-05T12:46:25.188319", "event": "data_fetch_success", "tickers": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG", "QQQ"]}
+{"timestamp": "2025-12-05T12:46:25.190991", "event": "empty_dataframe"}
+{"timestamp": "2025-12-05T13:39:09.752779", "event": "advisor_run_start", "version": "1.0", "assets": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG"], "config": {"fast_vol_threshold": 0.0177, "slow_vol_threshold": 0.0378, "inertia_threshold": 0.0286}}
+{"timestamp": "2025-12-05T13:39:10.385478", "event": "data_fetch_success", "tickers": ["NVDA", "MU", "AAPL", "AMD", "ASML", "MSFT", "GOOG", "QQQ"]}
+{"timestamp": "2025-12-05T13:39:10.474280", "event": "features_generated", "feature_shape": [502, 7, 3], "observation_window_shape": [60, 7, 3]}
