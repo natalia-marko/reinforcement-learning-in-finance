@@ -1,0 +1,3 @@
+[submodule "daily_adviser"]
+	path = daily_adviser
+	url = https://github.com/natalia-marko/daily-financial-adviser.git
