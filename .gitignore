@@ -26,6 +26,9 @@ wheels/
 
 # Data files (large)
 *.csv
+
+# Allow curated CSVs in top-level classified exports
+!classified/daily_adviser/universe/*.csv
 *.json
 *.pkl
 *.zip

@@ -9,8 +9,12 @@ Nothing here is required for runtime. It’s meant for:
 
 ## Contents
 
-- `deliverables/best_of_2025/`: public-facing “Best of 2025” materials (also recommended to live in a separate public repo).
 - `reports/`: audit reports (PDF/XLSX).
-- `data/universe/`: investable universe CSVs and checkpoints.
+- `universe/`: investable universe CSVs and checkpoints.
+- `best_of_2025_2025.ipynb`: “Best of 2025” notebook copy (share-friendly filename).
+
+## Notes
+
+These files are curated copies exported from the `daily_adviser/` submodule.
 
 
