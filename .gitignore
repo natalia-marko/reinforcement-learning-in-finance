@@ -1,69 +1,58 @@
-# Jupyter Notebook
-.ipynb_checkpoints/
-*/.ipynb_checkpoints/*
+.DS_Store
+.AppleDouble
+.LSOverride
 
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
+*.pyd
 *.so
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Data files (large)
-*.csv
-
-# Allow curated CSVs in top-level classified exports
-!classified/daily_adviser/universe/*.csv
-*.json
-*.pkl
-*.zip
-**/outputs/
-**/cache/
-**/news_cache/
-**/models/*.pkl
-**/models/*.zip
-**/models/*.pth
-
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-.cursor/rules/
-
-# Environment
-.env
-.venv
-env/
+.venv/
 venv/
 ENV/
-env.bak/
-venv.bak/
+env/
 
-# Logs
-logs/
-*.log
+# Jupyter
+.ipynb_checkpoints/
+
+# Editor / tooling
+.vscode/
+.idea/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.claude/
+**/.claude/
+.coverage
+htmlcov/
+
+# Secrets / keys
+**/api_keys.json
+**/api_key*.json
+**/*apikey*.json
+**/*secret*.json
+**/*.pem
+**/*.key
+**/.env
+**/.env.*
+
+# Large / generated ML artifacts
+**/models/
+**/tensorboard_logs/
+**/logs/
+**/outputs/
+**/checkpoints/
+**/*.zip
+**/*.pth
+**/*.pt
+**/*.pkl
+
+# Data (often large or proprietary)
+**/data/
+
+# Archive (explicitly requested)
+archive/
+
+# Misc
+*.pyc

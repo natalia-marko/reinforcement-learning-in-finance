@@ -1,0 +1,46 @@
+{
+  "qqq_baseline": {
+    "strategy": "QQQ Buy & Hold",
+    "total_return": 0.21435277991891044,
+    "sharpe_ratio": 1.3383549711130647,
+    "max_drawdown": 0.1021845466022235,
+    "volatility": 0.15722425584311486,
+    "win_rate": 0.75,
+    "final_value": 121435.27799189104
+  },
+  "best_base_agent": {
+    "total_return": 0.6979650857327128,
+    "sharpe_ratio": 1.5657950565467196,
+    "max_drawdown": 0.21408680269255848,
+    "volatility": 0.3860423987296186,
+    "final_value": 169796.50857327128,
+    "win_rate": 0.6666666666666666,
+    "strategy": "Best Base (sent_PPO)"
+  },
+  "enhanced_super_agent": {
+    "val_sharpe": 1.0123519923801836,
+    "test_metrics": {
+      "total_return": 0.6188414029596339,
+      "sharpe_ratio": 1.6635343349477456,
+      "max_drawdown": 0.192060412567634,
+      "volatility": 0.32272959143008273,
+      "final_value": 161884.14029596339,
+      "win_rate": 0.6666666666666666,
+      "strategy": "Enhanced Super (SAC+Full)"
+    }
+  },
+  "meta_agent": {
+    "val_sharpe": 0.8525908531443456,
+    "test_metrics": {
+      "total_return": 0.778987738905063,
+      "sharpe_ratio": 1.9991165473901662,
+      "max_drawdown": 0.15088666447453086,
+      "volatility": 0.3169554977776471,
+      "final_value": 177898.7738905063,
+      "win_rate": 0.6666666666666666,
+      "strategy": "Meta Agent"
+    }
+  },
+  "best_strategy": "Meta",
+  "split": "70_20_10"
+}

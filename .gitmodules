@@ -1,6 +1,0 @@
-[submodule "daily_adviser"]
-	path = daily_adviser
-	url = https://github.com/natalia-marko/daily-financial-adviser.git
-[submodule "sniper_production"]
-	path = sniper_production
-	url = https://github.com/natalia-marko/tech-sniper-auto.git
